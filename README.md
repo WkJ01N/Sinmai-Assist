@@ -17,6 +17,7 @@ This is a cheat Mod, using by your own risk.
 	- Unlock Event
     - Unlock Utage
     - Force Unlock Double Player Utage
+    - Speed Hack
 	- Force Current ls Best
 	- Reset Login Bonus Record
     - Set All Character As Same And Lock
