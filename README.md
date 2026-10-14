@@ -67,15 +67,3 @@ This is a cheat Mod, using by your own risk.
 
 * [MelonLoader Wiki](https://melonwiki.xyz/#/modders/quickstart)
 * [Harmony Docs](https://harmony.pardeike.net/articles/patching-prefix.html)
-
-
-## Contributors
-
-<a href="https://github.com/WYH2004-MC/Sinmai-Assist/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=WYH2004-MC/Sinmai-Assist" />
-</a>
-
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=WYH2004-MC/Sinmai-Assist&type=Date)](https://www.star-history.com/#WYH2004-MC/Sinmai-Assist&Date)
