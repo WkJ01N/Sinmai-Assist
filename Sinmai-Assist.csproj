@@ -304,6 +304,8 @@
     <Compile Include="Cheat\AutoPlay.cs" />
     <Compile Include="Cheat\ChartController.cs" />
     <Compile Include="Cheat\FastSkip.cs" />
+    <Compile Include="Cheat\ScorePlanner.cs" />
+    <Compile Include="Cheat\ScorePlanAdapter.cs" />
     <Compile Include="Cheat\ForceCurrentIsBest.cs" />
     <Compile Include="Cheat\ResetLoginBonusRecord.cs" />
     <Compile Include="Cheat\RewriteLoginBonusStamp.cs" />
@@ -360,6 +362,7 @@
     <Compile Include="GUI\GraphicPanel.cs" />
     <Compile Include="GUI\MainGUI.cs" />
     <Compile Include="GUI\ShowVersionInfo.cs" />
+    <Compile Include="GUI\InfoSnapshot.cs" />
     <Compile Include="GUI\Style.cs" />
     <Compile Include="GUI\UserDataPanel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -369,6 +372,7 @@
     <Compile Include="Utils\GameMessageManager.cs" />
     <Compile Include="Utils\Keyboard.cs" />
     <Compile Include="Utils\Server.cs" />
+    <Compile Include="Utils\RuntimePropertyReader.cs" />
     <Compile Include="Utils\User.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -394,7 +398,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="ILMerge.Fody" Version="1.24.0" />
+    <PackageReference Include="ILMerge.Fody" Version="1.24.0" PrivateAssets="All" />
     <PackageReference Include="LavaGang.MelonLoader" Version="0.6.4" />
     <PackageReference Include="System.ValueTuple" Version="4.5.0" />
     <PackageReference Include="Unosquare.Swan.Lite" Version="3.1.0" />

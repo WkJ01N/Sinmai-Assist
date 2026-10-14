@@ -15,7 +15,7 @@ public class DisableMask
         {
             GameObject.Find("Mask").SetActive(false);
         }
-        catch (Exception e)
+        catch (Exception)
         {
             MelonLogger.Warning("Maybe the current Sinmai build does not have GameObject \"Mask\".");
         }

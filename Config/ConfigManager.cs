@@ -40,8 +40,11 @@ namespace SinmaiAssist.Config
             catch (YamlException ex)
             {
                 MelonLogger.Error($"Load Config '{_configPath}' Failed: \n{ex.Message}");
-                MelonLogger.Warning($"Your Config is not valid, please delete it and restart the game.");
-                throw;
+                string backup = _configPath + $".broken.{DateTime.Now:yyyyMMddHHmmss}.{Guid.NewGuid():N}";
+                File.Move(_configPath, backup);
+                _config = new T();
+                SaveConfig();
+                MelonLogger.Warning($"Recovered this config only. Original saved to '{backup}'.");
             }
             catch (Exception ex)
             {
@@ -88,7 +91,7 @@ namespace SinmaiAssist.Config
         private void SaveConfig()
         {
             var directory = Path.GetDirectoryName(_configPath);
-            if (!Directory.Exists(directory))
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
 
             var serializer = CreateSerializer();
@@ -102,6 +105,23 @@ namespace SinmaiAssist.Config
             var deserializer = CreateDeserializer();
             var yaml = File.ReadAllText(_configPath);
             _config = deserializer.Deserialize<T>(yaml);
+            if (_config == null) _config = new T();
+        }
+
+        // Fill null nested nodes/keys from the corresponding default instance. Missing
+        // properties already retain their initializers; this also handles explicit YAML null.
+        public static void FillDefaults(object config, object defaults)
+        {
+            foreach (var property in config.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!property.CanRead || !property.CanWrite || property.GetIndexParameters().Length != 0) continue;
+                var fallback = property.GetValue(defaults);
+                var value = property.GetValue(config);
+                if (value == null && fallback != null) { property.SetValue(config, fallback); value = fallback; }
+                if (value != null && fallback != null && property.PropertyType.IsClass &&
+                    property.PropertyType.Namespace == typeof(T).Namespace)
+                    FillDefaults(value, fallback);
+            }
         }
     }
 }

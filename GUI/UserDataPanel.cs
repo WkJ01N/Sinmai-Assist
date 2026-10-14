@@ -34,9 +34,15 @@ public class UserDataPanel
             _player1 = Singleton<UserDataManager>.Instance.GetUserData(0);
             _player2 = Singleton<UserDataManager>.Instance.GetUserData(1);
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            // ignore
+            _player1 = null;
+            _player2 = null;
+        }
+        if (_player1?.Detail == null || _player2?.Detail == null)
+        {
+            GUILayout.Label("User data is not ready.", MainGUI.Style.Text);
+            return;
         }
         GUILayout.Label($"1P: {_player1.Detail.UserName} ({_player1.Detail.UserID})", MainGUI.Style.Text);
         GUILayout.Label($"2P: {_player2.Detail.UserName} ({_player2.Detail.UserID})", MainGUI.Style.Text);

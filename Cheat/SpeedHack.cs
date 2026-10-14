@@ -16,6 +16,9 @@ public static class SpeedHack
     public const float Step = 0.1f;
     public const float MinSpeed = 0.1f;
     public const float DefaultSpeed = 1.0f;
+    private static bool _ownsTimeScale;
+    private static float _previousTimeScale;
+    private static float _appliedTimeScale;
 
     public static void OnUpdate()
     {
@@ -55,7 +58,7 @@ public static class SpeedHack
 
     public static void ApplySpeed(float speed, bool notify)
     {
-        float clampedSpeed = Mathf.Max(MinSpeed, speed);
+        float clampedSpeed = float.IsNaN(speed) || float.IsInfinity(speed) ? DefaultSpeed : Mathf.Max(MinSpeed, speed);
         clampedSpeed = Mathf.Round(clampedSpeed * 10f) / 10f;
         SinmaiAssist.MainConfig.Cheat.SpeedHack.SpeedMultiplier = clampedSpeed;
 
@@ -63,7 +66,7 @@ public static class SpeedHack
 
         try
         {
-            float currentPitchCents = GetPitchCents();
+            float currentPitchCents = SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable ? GetPitchCents() : 0f;
             SpeedHackBgmPitchPatch.UpdateActiveBgmPitch(currentPitchCents);
         }
         catch (Exception e)
@@ -85,18 +88,28 @@ public static class SpeedHack
     public static bool ShouldScaleGameClock()
     {
         var config = SinmaiAssist.MainConfig.Cheat.SpeedHack;
-        return config.Enable && (IsInChartPlay() || config.EnableGlobalSpeed);
+        return !SinmaiAssist.MainConfig.ModSetting.SafeMode && config.Enable && (IsInChartPlay() || config.EnableGlobalSpeed);
     }
 
     public static bool ShouldApplyTimeScale()
     {
         var config = SinmaiAssist.MainConfig.Cheat.SpeedHack;
-        return config.Enable && config.EnableGlobalSpeed && !IsInChartPlay();
+        return !SinmaiAssist.MainConfig.ModSetting.SafeMode && config.Enable && config.EnableGlobalSpeed && !IsInChartPlay();
     }
 
     public static void ApplyGlobalSpeedState()
     {
-        Time.timeScale = ShouldApplyTimeScale() ? GetCurrentSpeed() : DefaultSpeed;
+        if (!ShouldApplyTimeScale()) { RestoreGlobalSpeed(); return; }
+        if (!_ownsTimeScale) { _previousTimeScale = Time.timeScale; _ownsTimeScale = true; }
+        _appliedTimeScale = GetCurrentSpeed();
+        Time.timeScale = _appliedTimeScale;
+    }
+
+    public static void RestoreGlobalSpeed()
+    {
+        if (!_ownsTimeScale) return;
+        if (Mathf.Approximately(Time.timeScale, _appliedTimeScale)) Time.timeScale = _previousTimeScale;
+        _ownsTimeScale = false;
     }
 
     public static float GetCurrentSpeed()
@@ -261,7 +274,7 @@ internal static class SpeedHackAudioClockPatch
     [HarmonyPatch(typeof(SoundCtrl), "GetPlayTiming")]
     private static void GetPlayTimingPostfix(ref long __result, int playerID)
     {
-        if (!SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable) return;
+        if (!SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable || __result < 0) return;
 
         if (playerID != (int)SoundManager.PlayerID.Music &&
             playerID != (int)SoundManager.PlayerID.Bgm &&

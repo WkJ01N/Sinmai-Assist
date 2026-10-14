@@ -61,5 +61,6 @@ public class DebugPanel
         if (GUILayout.Button("Toggle Show Info", MainGUI.Style.Button)) SinmaiAssist.MainConfig.ModSetting.ShowInfo = !SinmaiAssist.MainConfig.ModSetting.ShowInfo;
         if (GUILayout.Button("Toggle Show FPS", MainGUI.Style.Button)) SinmaiAssist.MainConfig.Common.ShowFPS = !SinmaiAssist.MainConfig.Common.ShowFPS;
         UnityLogger = GUILayout.Toggle(UnityLogger, "Log Unity Debug?");
+        SinmaiAssist.MainConfig.Common.UnityLogger.Enable = UnityLogger;
     }
 }

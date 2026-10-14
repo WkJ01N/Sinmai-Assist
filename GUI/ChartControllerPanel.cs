@@ -8,8 +8,7 @@ public class ChartControllerPanel
     public static void OnGUI()
     {
         GUIStyle buttonStyle = new GUIStyle(MainGUI.Style.Button) { fontSize = 24 };
-        ChartController.ButtonStatus = ChartController.Button.None;
-        Manager.NotesManager notesManager = new Manager.NotesManager();
+        Manager.NotesManager notesManager = Manager.NotesManager.Instance();
         GUILayout.Label($"Timer Status: {(notesManager.IsPlaying() ? (ChartController.IsPlaying ? "Playing" : "Paused") : "Not Play")}", MainGUI.Style.Text);
         GUILayout.Label($"Timer:", new GUIStyle(MainGUI.Style.Text) { fontSize = 20 });
         GUILayout.Label($"{ChartController.Timer.ToString("0000000.0000")}", new GUIStyle(MainGUI.Style.Title) { fontSize = 20 });

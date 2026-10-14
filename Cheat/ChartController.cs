@@ -55,13 +55,15 @@ public class ChartController
     [HarmonyPatch(typeof(GameProcess), "OnUpdate")]
     private static void OnUpdate(GameProcess __instance)
     {
+        var requestedButton = ButtonStatus;
+        ButtonStatus = Button.None;
         try
         {
             _gameProcess = __instance;
             GameSequence sequence = (GameSequence)typeof(GameProcess).GetField("_sequence", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(__instance);
             _monitors = (GameMonitor[])typeof(GameProcess).GetField("_monitors", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(_gameProcess);
             _gameMovie = (MovieController)typeof(GameProcess).GetField("_gameMovie", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(__instance);
-            _notesManager = new NotesManager();
+            _notesManager = NotesManager.Instance();
             if (!_notesManager.IsPlaying())
             {
                 IsPlaying = true;
@@ -76,7 +78,7 @@ public class ChartController
                 {
                     Timer += GameManager.GetGameMSecAddD();
                 }
-                if (ButtonStatus == Button.Pause || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.ChartController.Pause.KeyCode))
+                if (requestedButton == Button.Pause || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.ChartController.Pause.KeyCode))
                 {
                     if (IsPlaying)
                     {
@@ -103,22 +105,22 @@ public class ChartController
                     Singleton<GamePlayManager>.Instance.Initialize(IsPartyPlay);
                     TimeSkip(16);
                 }
-                else if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.ChartController.SetRecord.KeyCode) || ButtonStatus == Button.Set)
+                else if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.ChartController.SetRecord.KeyCode) || requestedButton == Button.Set)
                 {
                     RecordTime = (int)Timer;
                     MelonLogger.Msg($"Record Time: {RecordTime}");
                 }
-                else if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.ChartController.ReturnRecord.KeyCode) || ButtonStatus == Button.Back)
+                else if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.ChartController.ReturnRecord.KeyCode) || requestedButton == Button.Back)
                 {
                     int time = RecordTime == 0 ? 999999 : (int)Timer - RecordTime;
                     TimeSkip(-time);
                     TimeSkip(0);
                     MelonLogger.Msg($"Time Jump: {RecordTime}({-time})");
                 }
-                else if (ButtonStatus != Button.None)
+                else if (requestedButton != Button.None)
                 {
                     Singleton<GamePlayManager>.Instance.Initialize(IsPartyPlay);
-                    switch (ButtonStatus)
+                    switch (requestedButton)
                     {
                         case Button.TimeSkipAdd:
                             TimeSkip(100);

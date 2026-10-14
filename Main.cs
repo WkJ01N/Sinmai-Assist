@@ -1,4 +1,4 @@
-﻿using MAI2System;
+using MAI2System;
 using MelonLoader;
 using System;
 using System.Collections;
@@ -21,7 +21,7 @@ namespace SinmaiAssist
     {
         public const string Name = "Sinmai-Assist";
         public const string Description = "SlimMod Melon Version For Sinmai";
-        public const string Author = "WYH2004 (Slim) & Error063";
+        public const string Author = "WYH2004 (Slim) & Error063 | Modified by WkJ01N";
         public const string Company = "Wahleak Technology()";
         public const string Version = "1.0.0";
         public const string DownloadLink = null;
@@ -32,6 +32,9 @@ namespace SinmaiAssist
         private MainGUI _mainGUI;
         private static bool _isPatchFailed = false;
         private static bool _isInitialized = false;
+        private static readonly object UnityLogLock = new object();
+        [ThreadStatic]
+        private static bool _writingUnityLog;
         private static ConfigManager<MainConfig> _mainConfigManager;
         private static ConfigManager<KeyBindConfig> _keyBindConfigManager;
         public static MainConfig MainConfig;
@@ -71,27 +74,7 @@ namespace SinmaiAssist
             catch (Exception e)
             {
                 MelonLogger.Error($"Error initializing mod config: \n{e}");
-                MelonLogger.Warning("Config appears broken, trying auto recovery...");
-                try
-                {
-                    BackupBrokenConfig(configPath);
-                    BackupBrokenConfig(keyBindConfigPath);
-                    var keyBindCoverter = new KeyBindConfig.Converter();
-                    _mainConfigManager = new ConfigManager<MainConfig>(configPath);
-                    _keyBindConfigManager = new ConfigManager<KeyBindConfig>(keyBindConfigPath, keyBindCoverter);
-                    MainConfig = _mainConfigManager.GetConfig();
-                    KeyBindConfig = _keyBindConfigManager.GetConfig();
-                    EnsureConfigDefaults();
-                    DummyLoginPanel.DummyUserId = MainConfig.Common.DummyLogin.DefaultUserId.ToString();
-                    DebugPanel.UnityLogger = MainConfig.Common.UnityLogger.Enable;
-                    _isInitialized = true;
-                    MelonLogger.Warning("Config auto recovery succeeded.");
-                }
-                catch (Exception recoverException)
-                {
-                    MelonLogger.Error($"Config auto recovery failed:\n{recoverException}");
-                    return;
-                }
+                return;
             }
             
             // 输出设备摄像头列表
@@ -108,6 +91,7 @@ namespace SinmaiAssist
                 CameraList += $"Resolution: {webCamTexture.width}x{webCamTexture.height}\n";
                 CameraList += $"FPS: {webCamTexture.requestedFPS}\n";
                 webCamTexture.Stop();
+                UnityEngine.Object.Destroy(webCamTexture);
                 CameraList += "\n";
             }
 
@@ -238,16 +222,22 @@ namespace SinmaiAssist
         }
         public override void OnApplicationQuit()
         {
-            
+            FastSkip.CancelPending();
+            SpeedHack.RestoreGlobalSpeed();
+            Application.logMessageReceived -= OnLogMessageReceived;
         }
 
         public override void OnUpdate()
         {
-            if (!_isInitialized || MainConfig?.Cheat?.SpeedHack == null)
+            if (!_isInitialized)
             {
                 return;
             }
 
+            _mainGUI.HandleInput();
+            ShowVersionInfo.Update();
+            if (MainConfig.ModSetting.SafeMode) { SpeedHack.RestoreGlobalSpeed(); return; }
+            if (MainConfig.Cheat.AutoPlay) AutoPlay.HandleInput();
             SpeedHack.ApplyGlobalSpeedState();
 
             if (MainConfig.Cheat.SpeedHack.Enable)
@@ -270,32 +260,37 @@ namespace SinmaiAssist
         
         private void OnLogMessageReceived(string condition, string stackTrace, LogType type)
         {
-            string logString = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{type}] {condition}\n{stackTrace}";
-
-            if (MainConfig?.Common?.UnityLogger == null)
+            if (_writingUnityLog || MainConfig?.Common?.UnityLogger?.Enable != true)
             {
                 return;
             }
-
-            if (MainConfig.Common.UnityLogger.Enable) File.AppendAllText(Path.Combine($"{BuildInfo.Name}/Unity.log"),logString + "\n");
-            if (MainConfig.Common.UnityLogger.Enable && MainConfig.Common.UnityLogger.PrintToConsole)
+            _writingUnityLog = true;
+            try
             {
-                switch (type)
+                string logString = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{type}] {condition}\n{stackTrace}";
+                lock (UnityLogLock) File.AppendAllText(Path.Combine(BuildInfo.Name, "Unity.log"), logString + "\n");
+                if (MainConfig.Common.UnityLogger.PrintToConsole)
                 {
-                    case LogType.Error:
-                    case LogType.Exception:
-                        MelonLogger.Error($"[UnityLogger] [{type}]: {condition}\n{stackTrace}");
-                        break;
-                    case LogType.Warning:
-                        MelonLogger.Warning($"[UnityLogger] [{type}]: {condition}\n{stackTrace}");
-                        break;
-                    case LogType.Assert:
-                    case LogType.Log:
-                    default:
-                        MelonLogger.Msg($"[UnityLogger] [{type}]: {condition}\n{stackTrace}");
-                        break;
+                    switch (type)
+                    {
+                        case LogType.Error:
+                        case LogType.Exception:
+                            MelonLogger.Error($"[UnityLogger] [{type}]: {condition}\n{stackTrace}");
+                            break;
+                        case LogType.Warning:
+                            MelonLogger.Warning($"[UnityLogger] [{type}]: {condition}\n{stackTrace}");
+                            break;
+                        case LogType.Assert:
+                        case LogType.Log:
+                        default:
+                            MelonLogger.Msg($"[UnityLogger] [{type}]: {condition}\n{stackTrace}");
+                            break;
+                    }
                 }
             }
+            catch (IOException ex) { MelonLogger.Warning($"Unity log write failed: {ex.Message}"); }
+            catch (UnauthorizedAccessException ex) { MelonLogger.Warning($"Unity log write failed: {ex.Message}"); }
+            finally { _writingUnityLog = false; }
         }
 
         private static bool Patch(Type type, bool noLoggerPrint = false)
@@ -363,25 +358,15 @@ namespace SinmaiAssist
         {
             MainConfig ??= new MainConfig();
             KeyBindConfig ??= new KeyBindConfig();
-            MainConfig.Cheat ??= new MainConfig.CheatConfig();
-            MainConfig.Cheat.SpeedHack ??= new MainConfig.SpeedHackConfig();
-            KeyBindConfig.SpeedHack ??= new KeyBindConfig.SpeedHackConfig();
+            ConfigManager<MainConfig>.FillDefaults(MainConfig, new MainConfig());
+            ConfigManager<KeyBindConfig>.FillDefaults(KeyBindConfig, new KeyBindConfig());
+            if (!Enum.IsDefined(typeof(MinimumCombo), MainConfig.Cheat.RandomSkip.MinimumCombo))
+                MainConfig.Cheat.RandomSkip.MinimumCombo = MinimumCombo.None;
+            float speed = MainConfig.Cheat.SpeedHack.SpeedMultiplier;
+            if (float.IsNaN(speed) || float.IsInfinity(speed) || speed < SpeedHack.MinSpeed)
+                MainConfig.Cheat.SpeedHack.SpeedMultiplier = SpeedHack.DefaultSpeed;
         }
 
-        private static void BackupBrokenConfig(string path)
-        {
-            if (!File.Exists(path))
-            {
-                return;
-            }
-
-            string directory = Path.GetDirectoryName(path);
-            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(path);
-            string extension = Path.GetExtension(path);
-            string backupPath = Path.Combine(directory, $"{fileNameWithoutExtension}.broken.{DateTime.Now:yyyyMMddHHmmss}{extension}");
-            File.Move(path, backupPath);
-            MelonLogger.Warning($"Backed up broken config: {backupPath}");
-        }
     }
     public class HarmonyLibPatch
     {

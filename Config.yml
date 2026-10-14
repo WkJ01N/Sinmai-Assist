@@ -45,6 +45,9 @@
 cheat:
   autoPlay: false
   fastSkip: false
+  randomSkip:
+    targetRank: SSS
+    minimumCombo: None
   chartController: false
   allCollection: false
   unlockEvent: false

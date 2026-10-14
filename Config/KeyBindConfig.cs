@@ -84,13 +84,11 @@ public class KeyBindConfig
         
         public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
         {
-            var scalar = (Scalar) parser.Current;
-            var value = scalar.Value;
-            parser.MoveNext();
+            var value = parser.Consume<Scalar>().Value;
             return new Key(value);
         }
 
-        public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer serializer)
+        public void WriteYaml(IEmitter emitter, object value, Type type, ObjectSerializer serializer)
         {
             if (value is Key key)
             {

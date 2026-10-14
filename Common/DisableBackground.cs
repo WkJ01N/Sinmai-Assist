@@ -34,7 +34,7 @@ public class DisableBackground
                 .Find("UI_SubBackground").gameObject;
             rightSubMonitor.SetActive(false);
         }
-        catch (Exception e)
+        catch (Exception)
         {
             // ignored
         }

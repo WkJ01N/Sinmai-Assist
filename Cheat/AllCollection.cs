@@ -12,11 +12,11 @@ public class AllCollection
 {
     [HarmonyPostfix]
     [HarmonyPatch(typeof(UserData), "get_FrameList")]
-    public static void FrameList(ref List<UserItem> __result, CollectionProcess __instance)
+    public static void FrameList(ref List<UserItem> __result)
     {
-        List<int> list2 = (from i in __result
+        HashSet<int> list2 = new HashSet<int>(from i in __result
                            where i.stock > 0
-                           select i.itemId).ToList();
+                           select i.itemId);
 
         foreach (KeyValuePair<int, FrameData> frame2 in Singleton<DataManager>.Instance.GetFrames())
         {
@@ -30,11 +30,11 @@ public class AllCollection
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(UserData), "get_IconList")]
-    public static void IconList(ref List<UserItem> __result, CollectionProcess __instance)
+    public static void IconList(ref List<UserItem> __result)
     {
-        List<int> list2 = (from i in __result
+        HashSet<int> list2 = new HashSet<int>(from i in __result
                            where i.stock > 0
-                           select i.itemId).ToList();
+                           select i.itemId);
 
         foreach (KeyValuePair<int, IconData> icon2 in Singleton<DataManager>.Instance.GetIcons())
         {
@@ -48,11 +48,11 @@ public class AllCollection
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(UserData), "get_PlateList")]
-    public static void PlateList(ref List<UserItem> __result, CollectionProcess __instance)
+    public static void PlateList(ref List<UserItem> __result)
     {
-        List<int> list2 = (from i in __result
+        HashSet<int> list2 = new HashSet<int>(from i in __result
                            where i.stock > 0
-                           select i.itemId).ToList();
+                           select i.itemId);
 
         foreach (KeyValuePair<int, PlateData> plate2 in Singleton<DataManager>.Instance.GetPlates())
         {

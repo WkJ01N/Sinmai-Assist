@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using MAI2.Util;
 using MAI2System;
@@ -23,19 +24,30 @@ public class User
             return null;
         }
         string path = $"{BuildInfo.Name}/UserBackup";
-        string userDataJson = "{";
-        userDataJson += $"\"accessCode\": \"{userData.Detail.AccessCode}\",";
-        userDataJson += $"\"userId\": {userData.Detail.UserID},";
-        userDataJson += $"\"userName\": \"{userData.Detail.UserName}\",";
-        userDataJson += $"\"rating\": {userData.Detail.Rating}";
-        
-        userDataJson += ",\"userFavoriteList\": " + GetFavoriteList(userData);
-        userDataJson += ",\"userCharacterList\": " + GetCharacterList(userData);
-        userDataJson += ",\"userMusicDetailList\": " + GetMusicDetailList(userData);
-        //userDataJson += ",\"userChargeList\": " + GetChargeList(userData);
-        //userDataJson += ",\"userCourseList\": " + GetCourseList(userData);
-
-        userDataJson += "}";
+        var payload = new Dictionary<string, object>
+        {
+            ["accessCode"] = userData.Detail.AccessCode,
+            ["userId"] = userData.Detail.UserID,
+            ["userName"] = userData.Detail.UserName,
+            ["rating"] = userData.Detail.Rating,
+            ["userFavoriteList"] = new[] { new Dictionary<string, object>
+            {
+                ["iconList"] = userData.IconList.Select(item => item.itemId).ToArray(),
+                ["plateList"] = userData.PlateList.Select(item => item.itemId).ToArray(),
+                ["titleList"] = userData.TitleList.Select(item => item.itemId).ToArray(),
+                ["frameList"] = userData.FrameList.Select(item => item.itemId).ToArray()
+            } },
+            ["userCharacterList"] = userData.CharaList.Export(),
+            ["userMusicDetailList"] = userData.ExportScoreDetailList().Select(detail => new Dictionary<string, object>
+            {
+                ["musicId"] = detail.musicId, ["level"] = (int)detail.level,
+                ["playCount"] = detail.playCount, ["achievement"] = detail.achievement,
+                ["comboStatus"] = (int)detail.comboStatus, ["syncStatus"] = (int)detail.syncStatus,
+                ["deluxscoreMax"] = detail.deluxscoreMax, ["scoreRank"] = (int)detail.scoreRank,
+                ["extNum1"] = detail.extNum1
+            }).ToArray()
+        };
+        string userDataJson = JSON.Dump(payload, EncodeOptions.NoTypeHints);
         
         string timestamp = DateTime.Now.ToString("yyMMddHHmmss");
         if (!Directory.Exists(Path.Combine(path)))

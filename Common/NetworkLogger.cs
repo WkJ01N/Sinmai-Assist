@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using MAI2.Util;
 using Manager;
 using MelonLoader;
@@ -6,6 +6,7 @@ using Net.Packet;
 using Net.VO;
 using System;
 using System.IO;
+using System.Collections.Generic;
 
 namespace SinmaiAssist.Common;
 
@@ -18,8 +19,8 @@ public class NetworkLogger
         Response,
         Null
     }
-    private static bool isInsideProcImpl = false;
-    private static string NowApi = "";
+    [ThreadStatic]
+    private static Stack<Packet> _packetStack;
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Packet), "set_State")]
@@ -30,8 +31,7 @@ public class NetworkLogger
             string content = __instance.Query.GetRequest();
             // string baseUrl = (string)AccessTools.Field(typeof(Packet), "BaseUrl").GetValue(__instance);
             var baseUrl = Singleton<OperationManager>.Instance.GetBaseUri();
-            NowApi = baseUrl + __instance.Query.Api;
-            PrintNetworkLog(HttpMessageType.Request, NowApi, content);
+            PrintNetworkLog(HttpMessageType.Request, baseUrl + __instance.Query.Api, content);
         }
     }
 
@@ -39,38 +39,28 @@ public class NetworkLogger
     [HarmonyPatch(typeof(NetQuery<VOSerializer, VOSerializer>), "SetResponse")]
     public static void ResponseListener(ref string str)
     {
-        if (isInsideProcImpl)
+        if (_packetStack != null && _packetStack.Count != 0)
         {
             string ccontent = str;
-            PrintNetworkLog(HttpMessageType.Response, NowApi, ccontent);
+            var packet = _packetStack.Peek();
+            PrintNetworkLog(HttpMessageType.Response, Singleton<OperationManager>.Instance.GetBaseUri() + packet.Query.Api, ccontent);
         }
     }
 
-    /* Not available
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(Encoding), "GetString", new[] { typeof(byte[]) })]
-    public static void ResponseListener(Packet __instance, ref string __result)
-    {
-        if (isInsideProcImpl)
-        {
-            string ccontent = __result;
-            PrintNetworkLog(HttpMessageType.Response, NowApi, ccontent);
-        }
-    }
-    */
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(Packet), "ProcImpl")]
-    public static void ProcImplPrefix()
+    public static void ProcImplPrefix(Packet __instance)
     {
-        isInsideProcImpl = true;
+        if (_packetStack == null) _packetStack = new Stack<Packet>();
+        _packetStack.Push(__instance);
     }
 
-    [HarmonyPostfix]
+    [HarmonyFinalizer]
     [HarmonyPatch(typeof(Packet), "ProcImpl")]
-    public static void ProcImplPostfix()
+    public static void ProcImplFinalizer()
     {
-        isInsideProcImpl = false;
+        if (_packetStack != null && _packetStack.Count != 0) _packetStack.Pop();
     }
     private static void PrintNetworkLog(HttpMessageType httpMessageType, string api, string content)
     {

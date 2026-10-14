@@ -22,14 +22,18 @@ public class MainGUI
     
     private Rect _panelWindow;
     private Toolbar _toolbar = Toolbar.AutoPlay;
-    private bool _backspaceKeyDown = false;
-    private string _titleStr = BuildInfo.Name;
     
     public static readonly Style Style = new Style();
     
     public MainGUI()
     {
         
+    }
+
+    public void HandleInput()
+    {
+        if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.SinmaiAssist.ShowUserPanel.KeyCode))
+            SinmaiAssist.MainConfig.ModSetting.ShowPanel = !SinmaiAssist.MainConfig.ModSetting.ShowPanel;
     }
     
     public void OnGUI()
@@ -39,20 +43,10 @@ public class MainGUI
             return;
         }
 
-        if (DebugInput.GetKey(SinmaiAssist.KeyBindConfig.SinmaiAssist.ShowUserPanel.KeyCode))
-        {
-            if(!_backspaceKeyDown) SinmaiAssist.MainConfig.ModSetting.ShowPanel = !SinmaiAssist.MainConfig.ModSetting.ShowPanel;
-            _backspaceKeyDown = true;
-        }
-        else
-        {
-            _backspaceKeyDown = false;
-        }
-                
         if (SinmaiAssist.MainConfig.ModSetting.ShowPanel)
         {
-            if (SinmaiAssist.MainConfig.ModSetting.SafeMode) _titleStr += "(SafeMode)";
-            _panelWindow = GUILayout.Window(10086, _panelWindow, MainPanel, _titleStr);
+            string title = BuildInfo.Name + (SinmaiAssist.MainConfig.ModSetting.SafeMode ? " (SafeMode)" : "");
+            _panelWindow = GUILayout.Window(10086, _panelWindow, MainPanel, title);
             SinmaiAssist.MainConfig.ModSetting.ShowPanel = true;
         }
         else
@@ -104,7 +98,8 @@ public class MainGUI
                 GUILayout.Height(20f)
             );
             
-            selectedToolbar = startIndex + rowSelection;
+            if (rowSelection >= 0 && rowSelection < rowToolbarNames.Length)
+                selectedToolbar = startIndex + rowSelection;
 
             GUILayout.EndHorizontal();
         }

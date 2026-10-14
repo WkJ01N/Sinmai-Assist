@@ -45,6 +45,9 @@
 cheat:
   autoPlay: false # 自动游玩 
   fastSkip: false # 快速跳过
+  randomSkip: # 在 FastSkip 面板选择 Random；独立设置评级和最低连击标记
+    targetRank: SSS
+    minimumCombo: None # None / FC / FCPlus / AP
   chartController: false # 铺面控制器(歌曲进度控制)
   allCollection: false # 解锁全部收藏品
   unlockEvent: false # 解锁全部活动

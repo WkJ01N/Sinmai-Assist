@@ -37,6 +37,7 @@ public class MainConfig
     {
         public bool AutoPlay { get; set; } = false;
         public bool FastSkip { get; set; } = false;
+        public RandomSkipConfig RandomSkip { get; set; } = new RandomSkipConfig();
         public bool ChartController { get; set; } = false;
         public SpeedHackConfig SpeedHack { get; set; } = new SpeedHackConfig();
         public bool AllCollection { get; set; } = false;
@@ -124,6 +125,12 @@ public class MainConfig
         public bool Enable { get; set; } = false;
         public bool EnableGlobalSpeed { get; set; } = false;
         public float SpeedMultiplier { get; set; } = 1.0f;
+    }
+
+    public class RandomSkipConfig
+    {
+        public string TargetRank { get; set; } = "SSS";
+        public global::SinmaiAssist.Cheat.MinimumCombo MinimumCombo { get; set; } = global::SinmaiAssist.Cheat.MinimumCombo.None;
     }
 
     public class RewriteNoteJudgeTimingConfig

@@ -11,6 +11,53 @@ namespace SinmaiAssist.Cheat
 {
     public class AutoPlay
     {
+        private static readonly System.Reflection.FieldInfo NoteBaseAppearMsecFieldInfo = AccessTools.Field(typeof(NoteBase), "AppearMsec");
+        private static readonly System.Reflection.FieldInfo NoteBaseIsExNoteFieldInfo = AccessTools.Field(typeof(NoteBase), "IsExNote");
+        private static readonly System.Reflection.MethodInfo NoteBasePlayJudgeSeMethodInfo = AccessTools.Method(typeof(NoteBase), "PlayJudgeSe");
+        private static readonly System.Reflection.FieldInfo NoteBaseJudgeResultFieldInfo = AccessTools.Field(typeof(NoteBase), "JudgeResult");
+        private static readonly System.Reflection.MethodInfo SlideRootIsNoteCheckTimeStartMethodInfo = AccessTools.Method(typeof(SlideRoot), "IsNoteCheckTimeStart");
+        private static readonly System.Reflection.FieldInfo SlideRootJudgeTimingDiffMsecFieldInfo = AccessTools.Field(typeof(SlideRoot), "JudgeTimingDiffMsec");
+        private static readonly System.Reflection.FieldInfo SlideRootJudgeResultFieldInfo = AccessTools.Field(typeof(SlideRoot), "JudgeResult");
+        private static readonly System.Reflection.FieldInfo SlideRootTailMsecFieldInfo = AccessTools.Field(typeof(SlideRoot), "TailMsec");
+        private static readonly System.Reflection.FieldInfo SlideRootlastWaitTimeFieldInfo = AccessTools.Field(typeof(SlideRoot), "lastWaitTime");
+        private static readonly System.Reflection.FieldInfo SlideRootJudgeTypeFieldInfo = AccessTools.Field(typeof(SlideRoot), "JudgeType");
+        private static readonly System.Reflection.FieldInfo SlideRootlastWaitTimeForJudgeFieldInfo = AccessTools.Field(typeof(SlideRoot), "lastWaitTimeForJudge");
+        private static readonly System.Reflection.MethodInfo NoteBaseIsNoteCheckTimeStartMethodInfo = AccessTools.Method(typeof(NoteBase), "IsNoteCheckTimeStart");
+        private static readonly System.Reflection.FieldInfo NoteBaseJudgeTimingDiffMsecFieldInfo = AccessTools.Field(typeof(NoteBase), "JudgeTimingDiffMsec");
+        private static readonly System.Reflection.FieldInfo NoteBaseJudgeTypeFieldInfo = AccessTools.Field(typeof(NoteBase), "JudgeType");
+        private static readonly System.Reflection.FieldInfo TouchNoteBTouchAreaFieldInfo = AccessTools.Field(typeof(TouchNoteB), "TouchArea");
+        private static readonly System.Reflection.PropertyInfo NoteBaseButtonIdProperty = AccessTools.Property(typeof(NoteBase), "ButtonId");
+        private static readonly System.Reflection.MethodInfo TouchNoteBPlayJudgeSeMethodInfo = AccessTools.Method(typeof(TouchNoteB), "PlayJudgeSe");
+
+        [HarmonyPrepare]
+        public static bool Prepare()
+        {
+            bool ready = NoteBaseButtonIdProperty != null && NoteBaseJudgeTypeFieldInfo != null && NoteBaseAppearMsecFieldInfo != null &&
+                SlideRootJudgeTypeFieldInfo != null && SlideRootlastWaitTimeForJudgeFieldInfo != null &&
+                TouchNoteBTouchAreaFieldInfo != null && NoteBasePlayJudgeSeMethodInfo != null &&
+                SlideRootIsNoteCheckTimeStartMethodInfo != null && SlideRootlastWaitTimeFieldInfo != null &&
+                NoteBaseJudgeResultFieldInfo != null && NoteBaseIsNoteCheckTimeStartMethodInfo != null &&
+                SlideRootTailMsecFieldInfo != null && NoteBaseJudgeTimingDiffMsecFieldInfo != null &&
+                NoteBaseIsExNoteFieldInfo != null && TouchNoteBPlayJudgeSeMethodInfo != null &&
+                SlideRootJudgeTimingDiffMsecFieldInfo != null && SlideRootJudgeResultFieldInfo != null;
+            if (!ready) MelonLogger.Error("AutoPlay disabled: required note interfaces are missing.");
+            return ready;
+        }
+
+        public static void HandleInput()
+        {
+            var keys = SinmaiAssist.KeyBindConfig.AutoPlay;
+            if (DebugInput.GetKeyDown(keys.None.KeyCode)) autoPlayMode = AutoPlayMode.None;
+            if (DebugInput.GetKeyDown(keys.Critical.KeyCode)) autoPlayMode = AutoPlayMode.Critical;
+            if (DebugInput.GetKeyDown(keys.Perfect.KeyCode)) autoPlayMode = AutoPlayMode.Perfect;
+            if (DebugInput.GetKeyDown(keys.Great.KeyCode)) autoPlayMode = AutoPlayMode.Great;
+            if (DebugInput.GetKeyDown(keys.Good.KeyCode)) autoPlayMode = AutoPlayMode.Good;
+            if (DebugInput.GetKeyDown(keys.Random.KeyCode)) autoPlayMode = AutoPlayMode.Random;
+            if (DebugInput.GetKeyDown(keys.RandomAllPerfect.KeyCode)) autoPlayMode = AutoPlayMode.RandomAllPerfect;
+            if (DebugInput.GetKeyDown(keys.RandomFullComboPlus.KeyCode)) autoPlayMode = AutoPlayMode.RandomFullComboPlus;
+            if (DebugInput.GetKeyDown(keys.RandomFullCombo.KeyCode)) autoPlayMode = AutoPlayMode.RandomFullCombo;
+        }
+
         public enum AutoPlayMode
         {
             None,
@@ -77,6 +124,7 @@ namespace SinmaiAssist.Cheat
         [HarmonyPatch(typeof(GameManager), "AutoJudge")]
         public static void AutoJudge(ref NoteJudge.ETiming __result)
         {
+            if (!IsAutoPlay()) return;
             var random = UnityEngine.Random.Range(0, 1000);
             var random2 = 2;
             if (random < 350)
@@ -167,19 +215,20 @@ namespace SinmaiAssist.Cheat
         public static bool NoteBaseAutoPlayJudge(NoteBase __instance)
         {
             if (!IsAutoPlay()) return true;
-            var appearMsec = (float)AccessTools.Field(typeof(NoteBase), "AppearMsec").GetValue(__instance);
-            var isExNote = (bool)AccessTools.Field(typeof(NoteBase), "IsExNote").GetValue(__instance);
-            var playJudgeSeMethod = AccessTools.Method(typeof(NoteBase), "PlayJudgeSe");
+            var appearMsec = (float)NoteBaseAppearMsecFieldInfo.GetValue(__instance);
+            var isExNote = (bool)NoteBaseIsExNoteFieldInfo.GetValue(__instance);
+            var playJudgeSeMethod = NoteBasePlayJudgeSeMethodInfo;
 
-            if (NotesManager.GetCurrentMsec() > appearMsec - 4.1666665f && IsAutoPlay())
+            if ((ETiming)NoteBaseJudgeResultFieldInfo.GetValue(__instance) != ETiming.End) return false;
+            if (NotesManager.GetCurrentMsec() > appearMsec - 4.1666665f)
             {
-                if ((autoPlayMode == AutoPlayMode.RandomAllPerfect || autoPlayMode == AutoPlayMode.RandomFullCombo || autoPlayMode == AutoPlayMode.RandomFullComboPlus) && isExNote)
+                if ((autoPlayMode == AutoPlayMode.RandomAllPerfect || autoPlayMode == AutoPlayMode.RandomFullCombo || autoPlayMode == AutoPlayMode.RandomFullComboPlus) && (isExNote || __instance is TouchNoteB))
                 {
-                    AccessTools.Field(typeof(NoteBase), "JudgeResult").SetValue(__instance, NoteJudge.ETiming.Critical);
+                    NoteBaseJudgeResultFieldInfo.SetValue(__instance, NoteJudge.ETiming.Critical);
                 }
                 else
                 {
-                    AccessTools.Field(typeof(Monitor.NoteBase), "JudgeResult").SetValue(__instance, GameManager.AutoJudge());
+                    NoteBaseJudgeResultFieldInfo.SetValue(__instance, GameManager.AutoJudge());
                 }
                 playJudgeSeMethod.Invoke(__instance, null);
             }
@@ -191,7 +240,7 @@ namespace SinmaiAssist.Cheat
         public static bool SlideRootJudge(SlideRoot __instance, ref bool __result)
         {
             if (!IsAutoPlay()) return true;
-            var isNoteCheckTimeStartMethod = AccessTools.Method(typeof(SlideRoot), "IsNoteCheckTimeStart");
+            var isNoteCheckTimeStartMethod = SlideRootIsNoteCheckTimeStartMethodInfo;
             bool isNoteCheckTimeStart = (bool)isNoteCheckTimeStartMethod.Invoke(__instance, new object[] { Singleton<GamePlayManager>.Instance.GetGameScore(__instance.MonitorId).UserOption.GetJudgeTimingFrame() });
             if (!isNoteCheckTimeStart)
             {
@@ -199,12 +248,12 @@ namespace SinmaiAssist.Cheat
                 return false;
             }
 
-            var judgeTimingDiffMsecField = AccessTools.Field(typeof(SlideRoot), "JudgeTimingDiffMsec");
-            var judgeResultField = AccessTools.Field(typeof(SlideRoot), "JudgeResult");
-            var tailMsecField = AccessTools.Field(typeof(SlideRoot), "TailMsec");
-            var lastWaitTimeField = AccessTools.Field(typeof(SlideRoot), "lastWaitTime");
-            var judgeTypeField = AccessTools.Field(typeof(SlideRoot), "JudgeType");
-            var lastWaitTimeForJudgeField = AccessTools.Field(typeof(SlideRoot), "lastWaitTimeForJudge");
+            var judgeTimingDiffMsecField = SlideRootJudgeTimingDiffMsecFieldInfo;
+            var judgeResultField = SlideRootJudgeResultFieldInfo;
+            var tailMsecField = SlideRootTailMsecFieldInfo;
+            var lastWaitTimeField = SlideRootlastWaitTimeFieldInfo;
+            var judgeTypeField = SlideRootJudgeTypeFieldInfo;
+            var lastWaitTimeForJudgeField = SlideRootlastWaitTimeForJudgeFieldInfo;
 
             float judgeTimingDiffMsec = NotesManager.GetCurrentMsec() - (float)tailMsecField.GetValue(__instance) + (float)lastWaitTimeField.GetValue(__instance);
             judgeTimingDiffMsecField.SetValue(__instance, judgeTimingDiffMsec);
@@ -237,20 +286,19 @@ namespace SinmaiAssist.Cheat
         public static bool TouchNoteBJudge(TouchNoteB __instance, ref bool __result)
         {
             if (!IsAutoPlay()) return true;
-            var isNoteCheckTimeStartMethod = AccessTools.Method(typeof(NoteBase), "IsNoteCheckTimeStart");
+            var isNoteCheckTimeStartMethod = NoteBaseIsNoteCheckTimeStartMethodInfo;
             bool isNoteCheckTimeStart = (bool)isNoteCheckTimeStartMethod.Invoke(__instance, new object[] { Singleton<GamePlayManager>.Instance.GetGameScore(__instance.MonitorId).UserOption.GetJudgeTimingFrame() });
-            if (isNoteCheckTimeStart)
+            if (!isNoteCheckTimeStart)
             {
                 __result = false;
                 return false;
             }
-            var judgeTimingDiffMsecField = AccessTools.Field(typeof(NoteBase), "JudgeTimingDiffMsec");
-            var judgeResultField = AccessTools.Field(typeof(NoteBase), "JudgeResult");
-            var appearMsecField = AccessTools.Field(typeof(NoteBase), "AppearMsec");
-            var judgeTypeField = AccessTools.Field(typeof(NoteBase), "JudgeType");
-            var buttonIdField = AccessTools.Field(typeof(NoteBase), "ButtonId");
-            var TouchAreaField = AccessTools.Field(typeof(TouchNoteB), "TouchArea");
-            var playJudgeSeMethod = AccessTools.Method(typeof(TouchNoteB), "PlayJudgeSe");
+            var judgeTimingDiffMsecField = NoteBaseJudgeTimingDiffMsecFieldInfo;
+            var judgeResultField = NoteBaseJudgeResultFieldInfo;
+            var appearMsecField = NoteBaseAppearMsecFieldInfo;
+            var judgeTypeField = NoteBaseJudgeTypeFieldInfo;
+            var TouchAreaField = TouchNoteBTouchAreaFieldInfo;
+            var playJudgeSeMethod = TouchNoteBPlayJudgeSeMethodInfo;
 
             var judgeTimingDiffMsec = NotesManager.GetCurrentMsec() - (float)appearMsecField.GetValue(__instance);
             judgeTimingDiffMsecField.SetValue(__instance, judgeTimingDiffMsec);
@@ -269,7 +317,7 @@ namespace SinmaiAssist.Cheat
             if (judgeResult != NoteJudge.ETiming.End)
             {
                 playJudgeSeMethod.Invoke(__instance, null);
-                int buttonId = (int)buttonIdField.GetValue(__instance);
+                int buttonId = (int)NoteBaseButtonIdProperty.GetValue(__instance, null);
                 if (touchArea == TouchSensorType.B)
                 {
                     InputManager.SetUsedThisFrame(__instance.MonitorId, (InputManager.TouchPanelArea)(8 + buttonId));
@@ -294,27 +342,9 @@ namespace SinmaiAssist.Cheat
                 __result = true;
                 return false;
             }
+            __result = false;
             return false;
         }
 
-        [HarmonyPostfix]
-        [HarmonyPatch(typeof(TouchNoteB), "NoteCheck")]
-        public static void NoteCheck(TouchNoteB __instance)
-        {
-            if (!IsAutoPlay()) return;
-            var judgeResultField = AccessTools.Field(typeof(NoteBase), "JudgeResult");
-            var playJudgeSeMethod = AccessTools.Method(typeof(TouchNoteB), "PlayJudgeSe");
-            float appearMsec = (float)AccessTools.Field(typeof(NoteBase), "AppearMsec").GetValue(__instance);
-            if ((autoPlayMode == AutoPlayMode.RandomAllPerfect ||
-                autoPlayMode == AutoPlayMode.RandomFullComboPlus ||
-                autoPlayMode == AutoPlayMode.RandomFullCombo) &&
-                NotesManager.GetCurrentMsec() > appearMsec - 4.1666665f &&
-                IsAutoPlay())
-            {
-                judgeResultField.SetValue(__instance, NoteJudge.ETiming.Critical);
-                playJudgeSeMethod.Invoke(__instance, null);
-            }
-        }
     }
 }
-

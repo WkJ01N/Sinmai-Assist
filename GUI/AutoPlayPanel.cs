@@ -1,4 +1,4 @@
-﻿using SinmaiAssist.Cheat;
+using SinmaiAssist.Cheat;
 using UnityEngine;
 
 namespace SinmaiAssist.GUI;
@@ -9,31 +9,31 @@ public class AutoPlayPanel
     {
         GUILayout.Label($"Mode: {AutoPlay.autoPlayMode}", MainGUI.Style.Text);
         AutoPlay.DisableUpdate = GUILayout.Toggle(AutoPlay.DisableUpdate, "Disable Mode Update");
-        if (GUILayout.Button("Critical (AP+)", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.Critical.KeyCode))
+        if (GUILayout.Button("Critical (AP+)", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Critical;
         
-        if (GUILayout.Button("Perfect", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.Perfect.KeyCode))
+        if (GUILayout.Button("Perfect", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Perfect;
         
-        if (GUILayout.Button("Great", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.Great.KeyCode))
+        if (GUILayout.Button("Great", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Great;
 
-        if (GUILayout.Button("Good", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.Good.KeyCode))
+        if (GUILayout.Button("Good", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Good;
 
-        if (GUILayout.Button("Random", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.Random.KeyCode))
+        if (GUILayout.Button("Random", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Random;
 
-        if (GUILayout.Button("RandomAllPerfect", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.RandomAllPerfect.KeyCode))
+        if (GUILayout.Button("RandomAllPerfect", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.RandomAllPerfect;
 
-        if (GUILayout.Button("RandomFullComboPlus", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.RandomFullComboPlus.KeyCode))
+        if (GUILayout.Button("RandomFullComboPlus", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.RandomFullComboPlus;
 
-        if (GUILayout.Button("RandomFullCombo", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.RandomFullCombo.KeyCode))
+        if (GUILayout.Button("RandomFullCombo", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.RandomFullCombo;
 
-        if (GUILayout.Button("None", MainGUI.Style.Button) || DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.AutoPlay.None.KeyCode))
+        if (GUILayout.Button("None", MainGUI.Style.Button))
             AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.None;
     }
 }

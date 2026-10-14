@@ -376,3 +376,11 @@ Output
 /PostBuild.bat
 /Libs
 /.run
+
+# Local game references; these are not modifier source files.
+/Assembly-CSharp.dumped.dll
+/GameManager.cs
+/GameProcess.cs
+/NotesManager.cs
+/SoundCtrl.cs
+/SoundManager.cs
