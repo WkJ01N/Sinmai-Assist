@@ -34,6 +34,11 @@ public class MainGUI
     
     public void OnGUI()
     {
+        if (SinmaiAssist.MainConfig == null || SinmaiAssist.KeyBindConfig == null)
+        {
+            return;
+        }
+
         if (DebugInput.GetKey(SinmaiAssist.KeyBindConfig.SinmaiAssist.ShowUserPanel.KeyCode))
         {
             if(!_backspaceKeyDown) SinmaiAssist.MainConfig.ModSetting.ShowPanel = !SinmaiAssist.MainConfig.ModSetting.ShowPanel;

@@ -11,6 +11,7 @@ public class KeyBindConfig
 {
     public AutoPlayConfig AutoPlay { get; set; } = new AutoPlayConfig();
     public ChartControllerConfig ChartController { get; set; } = new ChartControllerConfig();
+    public SpeedHackConfig SpeedHack { get; set; } = new SpeedHackConfig();
     public SinmaiAssistConfig SinmaiAssist { get; set; } = new SinmaiAssistConfig();
 
     public class AutoPlayConfig
@@ -33,6 +34,13 @@ public class KeyBindConfig
         public Key Backward { get; set; } = "LeftArrow";
         public Key SetRecord { get; set; } = "DownArrow";
         public Key ReturnRecord { get; set; } = "UpArrow";
+    }
+
+    public class SpeedHackConfig
+    {
+        public Key Increase { get; set; } = "KeypadPlus";
+        public Key Decrease { get; set; } = "KeypadMinus";
+        public Key Reset { get; set; } = "KeypadMultiply";
     }
 
     public class SinmaiAssistConfig

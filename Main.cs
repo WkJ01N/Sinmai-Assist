@@ -31,6 +31,7 @@ namespace SinmaiAssist
     {
         private MainGUI _mainGUI;
         private static bool _isPatchFailed = false;
+        private static bool _isInitialized = false;
         private static ConfigManager<MainConfig> _mainConfigManager;
         private static ConfigManager<KeyBindConfig> _keyBindConfigManager;
         public static MainConfig MainConfig;
@@ -40,7 +41,10 @@ namespace SinmaiAssist
 
         public override void OnInitializeMelon()
         {
+            _isInitialized = false;
             if(!Directory.Exists($"./{BuildInfo.Name}")) Directory.CreateDirectory($"./{BuildInfo.Name}");
+            string configPath = $"./{BuildInfo.Name}/Config.yml";
+            string keyBindConfigPath = $"./{BuildInfo.Name}/KeyBindConfig.yml";
             
             // 初始化UnityLogger
             if(File.Exists($"./{BuildInfo.Name}/Unity.log"))  File.Delete($"{BuildInfo.Name}/Unity.log"); 
@@ -54,18 +58,40 @@ namespace SinmaiAssist
             try
             {
                 var keyBindCoverter = new KeyBindConfig.Converter();
-                _mainConfigManager = new ConfigManager<MainConfig>($"./{BuildInfo.Name}/Config.yml");
-                _keyBindConfigManager = new ConfigManager<KeyBindConfig>($"./{BuildInfo.Name}/KeyBindConfig.yml", keyBindCoverter);
+                _mainConfigManager = new ConfigManager<MainConfig>(configPath);
+                _keyBindConfigManager = new ConfigManager<KeyBindConfig>(keyBindConfigPath, keyBindCoverter);
                 MainConfig = _mainConfigManager.GetConfig();
                 KeyBindConfig = _keyBindConfigManager.GetConfig();
+                EnsureConfigDefaults();
                 DummyLoginPanel.DummyUserId = MainConfig.Common.DummyLogin.DefaultUserId.ToString();
                 DebugPanel.UnityLogger = MainConfig.Common.UnityLogger.Enable;
                 MelonLogger.Msg("Config Load Complete.");
+                _isInitialized = true;
             }
             catch (Exception e)
             {
                 MelonLogger.Error($"Error initializing mod config: \n{e}");
-                return;
+                MelonLogger.Warning("Config appears broken, trying auto recovery...");
+                try
+                {
+                    BackupBrokenConfig(configPath);
+                    BackupBrokenConfig(keyBindConfigPath);
+                    var keyBindCoverter = new KeyBindConfig.Converter();
+                    _mainConfigManager = new ConfigManager<MainConfig>(configPath);
+                    _keyBindConfigManager = new ConfigManager<KeyBindConfig>(keyBindConfigPath, keyBindCoverter);
+                    MainConfig = _mainConfigManager.GetConfig();
+                    KeyBindConfig = _keyBindConfigManager.GetConfig();
+                    EnsureConfigDefaults();
+                    DummyLoginPanel.DummyUserId = MainConfig.Common.DummyLogin.DefaultUserId.ToString();
+                    DebugPanel.UnityLogger = MainConfig.Common.UnityLogger.Enable;
+                    _isInitialized = true;
+                    MelonLogger.Warning("Config auto recovery succeeded.");
+                }
+                catch (Exception recoverException)
+                {
+                    MelonLogger.Error($"Config auto recovery failed:\n{recoverException}");
+                    return;
+                }
             }
             
             // 输出设备摄像头列表
@@ -196,6 +222,12 @@ namespace SinmaiAssist
             if (MainConfig.Cheat.SetAllCharacterAsSameAndLock) Patch(typeof(SetAllCharacterAsSameAndLock));
             if (MainConfig.Cheat.RewriteLoginBonusStamp.Enable) Patch(typeof(RewriteLoginBonusStamp));
 
+            // SpeedHack：始终注册 Harmony，各 Postfix 内根据 MainConfig.Cheat.SpeedHack.Enable 早退，便于开关节点无需重开游戏
+            Patch(typeof(SpeedHackGameClockPatch));
+            Patch(typeof(SpeedHackNotesClockPatch));
+            Patch(typeof(SpeedHackAudioClockPatch));
+            Patch(typeof(SpeedHackBgmPitchPatch));
+
             // 默认加载项
             Patch(typeof(PrintUserData));
             Patch(typeof(InputManager));
@@ -209,8 +241,28 @@ namespace SinmaiAssist
             
         }
 
+        public override void OnUpdate()
+        {
+            if (!_isInitialized || MainConfig?.Cheat?.SpeedHack == null)
+            {
+                return;
+            }
+
+            SpeedHack.ApplyGlobalSpeedState();
+
+            if (MainConfig.Cheat.SpeedHack.Enable)
+            {
+                SpeedHack.OnUpdate();
+            }
+        }
+
         public override void OnGUI()
         {
+            if (!_isInitialized || _mainGUI == null || MainConfig == null)
+            {
+                return;
+            }
+
             _mainGUI.OnGUI();
             if (MainConfig.Common.ShowFPS) ShowFPS.OnGUI();
             if (MainConfig.ModSetting.ShowInfo) ShowVersionInfo.OnGUI();
@@ -219,6 +271,11 @@ namespace SinmaiAssist
         private void OnLogMessageReceived(string condition, string stackTrace, LogType type)
         {
             string logString = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{type}] {condition}\n{stackTrace}";
+
+            if (MainConfig?.Common?.UnityLogger == null)
+            {
+                return;
+            }
 
             if (MainConfig.Common.UnityLogger.Enable) File.AppendAllText(Path.Combine($"{BuildInfo.Name}/Unity.log"),logString + "\n");
             if (MainConfig.Common.UnityLogger.Enable && MainConfig.Common.UnityLogger.PrintToConsole)
@@ -300,6 +357,30 @@ namespace SinmaiAssist
                                 "\r\nCheck for conflicting mods, or enabled incompatible options." +
                                 "\r\nIf you believe this is an error, please report the issue to the mod author." +
                                 "\r\n=================================================================");
+        }
+
+        private static void EnsureConfigDefaults()
+        {
+            MainConfig ??= new MainConfig();
+            KeyBindConfig ??= new KeyBindConfig();
+            MainConfig.Cheat ??= new MainConfig.CheatConfig();
+            MainConfig.Cheat.SpeedHack ??= new MainConfig.SpeedHackConfig();
+            KeyBindConfig.SpeedHack ??= new KeyBindConfig.SpeedHackConfig();
+        }
+
+        private static void BackupBrokenConfig(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            string directory = Path.GetDirectoryName(path);
+            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(path);
+            string extension = Path.GetExtension(path);
+            string backupPath = Path.Combine(directory, $"{fileNameWithoutExtension}.broken.{DateTime.Now:yyyyMMddHHmmss}{extension}");
+            File.Move(path, backupPath);
+            MelonLogger.Warning($"Backed up broken config: {backupPath}");
         }
     }
     public class HarmonyLibPatch

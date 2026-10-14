@@ -23,6 +23,40 @@ public class DebugPanel
         if (GUILayout.Button("Save P2 Option To DefaultOption", MainGUI.Style.Button)) Common.ChangeDefaultOption.SaveOptionFile(1L);
         if (GUILayout.Button("↑ ↓ ↑ ↓", MainGUI.Style.Button)) SoundManager.PlaySE(Mai2.Mai2Cue.Cue.SE_ENTRY_AIME_ERROR, 1);
         if (GUILayout.Button("Switch Utage Mode", MainGUI.Style.Button)) UnlockUtage.SwitchUtageMode();
+        GUILayout.Label("SpeedHack", MainGUI.Style.Title);
+        bool speedHackEnable = SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable;
+        bool newSpeedHackEnable = GUILayout.Toggle(speedHackEnable, "Enable SpeedHack");
+        if (newSpeedHackEnable != speedHackEnable)
+        {
+            SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable = newSpeedHackEnable;
+            if (newSpeedHackEnable)
+            {
+                SpeedHack.ApplyCurrentSpeed(true);
+            }
+            else
+            {
+                SpeedHack.ApplySpeed(SpeedHack.DefaultSpeed, true);
+                SpeedHack.ApplyGlobalSpeedState();
+            }
+        }
+
+        bool prevGuiEnabled = UnityEngine.GUI.enabled;
+        UnityEngine.GUI.enabled = SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable;
+        bool globalSpeedEnable = SinmaiAssist.MainConfig.Cheat.SpeedHack.EnableGlobalSpeed;
+        bool newGlobalSpeedEnable = GUILayout.Toggle(globalSpeedEnable, "Enable Global Speed");
+        if (newGlobalSpeedEnable != globalSpeedEnable)
+        {
+            SinmaiAssist.MainConfig.Cheat.SpeedHack.EnableGlobalSpeed = newGlobalSpeedEnable;
+            SpeedHack.ApplyGlobalSpeedState();
+        }
+        UnityEngine.GUI.enabled = prevGuiEnabled;
+
+        GUILayout.Label($"Current Speed: x{SinmaiAssist.MainConfig.Cheat.SpeedHack.SpeedMultiplier:0.0}", MainGUI.Style.Text);
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("-0.1", MainGUI.Style.Button)) SpeedHack.DecreaseSpeed();
+        if (GUILayout.Button("+0.1", MainGUI.Style.Button)) SpeedHack.IncreaseSpeed();
+        if (GUILayout.Button("Reset", MainGUI.Style.Button)) SpeedHack.ResetSpeed();
+        GUILayout.EndHorizontal();
         GUILayout.Label($"GUI Toggle", MainGUI.Style.Title);
         if (GUILayout.Button("Toggle Show Info", MainGUI.Style.Button)) SinmaiAssist.MainConfig.ModSetting.ShowInfo = !SinmaiAssist.MainConfig.ModSetting.ShowInfo;
         if (GUILayout.Button("Toggle Show FPS", MainGUI.Style.Button)) SinmaiAssist.MainConfig.Common.ShowFPS = !SinmaiAssist.MainConfig.Common.ShowFPS;

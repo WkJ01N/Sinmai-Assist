@@ -38,6 +38,7 @@ public class MainConfig
         public bool AutoPlay { get; set; } = false;
         public bool FastSkip { get; set; } = false;
         public bool ChartController { get; set; } = false;
+        public SpeedHackConfig SpeedHack { get; set; } = new SpeedHackConfig();
         public bool AllCollection { get; set; } = false;
         public bool UnlockEvent { get; set; } = false;
         public UnlockMusicConfig UnlockMusic { get; set; } = new UnlockMusicConfig();
@@ -116,6 +117,13 @@ public class MainConfig
     {
         public bool Enable { get; set; } = false;
         public bool UnlockDoublePlayerMusic { get; set; } = false;
+    }
+
+    public class SpeedHackConfig
+    {
+        public bool Enable { get; set; } = false;
+        public bool EnableGlobalSpeed { get; set; } = false;
+        public float SpeedMultiplier { get; set; } = 1.0f;
     }
 
     public class RewriteNoteJudgeTimingConfig

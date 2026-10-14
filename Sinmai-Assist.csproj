@@ -312,6 +312,7 @@
     <Compile Include="Cheat\UnlockMaster.cs" />
     <Compile Include="Cheat\UnlockMusic.cs" />
     <Compile Include="Cheat\UnlockUtage.cs" />
+    <Compile Include="Cheat\SpeedHack.cs" />
     <Compile Include="Common\AutoBackupData.cs" />
     <Compile Include="Common\BlockCoin.cs" />
     <Compile Include="Common\ChangeDefaultOption.cs" />
