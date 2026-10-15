@@ -49,6 +49,7 @@ public class Style
             return new GUIStyle(UnityEngine.GUI.skin.label)
             {
                 fontSize = 12,
+                wordWrap = true,
                 alignment = TextAnchor.MiddleLeft
             };
         }

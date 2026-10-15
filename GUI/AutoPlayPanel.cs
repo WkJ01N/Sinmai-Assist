@@ -1,39 +1,35 @@
 using SinmaiAssist.Cheat;
 using UnityEngine;
+using SinmaiAssist.Runtime;
 
 namespace SinmaiAssist.GUI;
 
 public class AutoPlayPanel
 {
+    internal static readonly string[] Ranks={"D","C","B","BB","BBB","A","AA","AAA","S","S+","SS","SS+","SSS","SSS+"};
     public static void OnGUI()
     {
-        GUILayout.Label($"Mode: {AutoPlay.autoPlayMode}", MainGUI.Style.Text);
-        AutoPlay.DisableUpdate = GUILayout.Toggle(AutoPlay.DisableUpdate, "Disable Mode Update");
-        if (GUILayout.Button("Critical (AP+)", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Critical;
-        
-        if (GUILayout.Button("Perfect", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Perfect;
-        
-        if (GUILayout.Button("Great", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Great;
-
-        if (GUILayout.Button("Good", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Good;
-
-        if (GUILayout.Button("Random", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.Random;
-
-        if (GUILayout.Button("RandomAllPerfect", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.RandomAllPerfect;
-
-        if (GUILayout.Button("RandomFullComboPlus", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.RandomFullComboPlus;
-
-        if (GUILayout.Button("RandomFullCombo", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.RandomFullCombo;
-
-        if (GUILayout.Button("None", MainGUI.Style.Button))
-            AutoPlay.autoPlayMode = AutoPlay.AutoPlayMode.None;
+        GUILayout.Label("Mode: "+(RankAutoPlay.Requested && !RankAutoPlay.Active ? "Rank (armed)" : AutoPlay.autoPlayMode.ToString()),MainGUI.Style.Title);
+        CommandUI.Toggle("auto.disableUpdate",AutoPlay.DisableUpdate,"Disable game mode synchronization");
+        foreach(var mode in new[]{"None","Critical","Perfect","Great","Good","Random","RandomAllPerfect","RandomFullComboPlus","RandomFullCombo"})
+            CommandUI.Button("auto."+mode);
+        GUILayout.Label("Rank-controlled AutoPlay",MainGUI.Style.Title);
+        GUILayout.Label("Configured target (apply with Enable / replan)",MainGUI.Style.Text);
+        DrawRank(RankAutoPlay.TargetRank,"auto.rankTarget.");
+        DrawCombo(RankAutoPlay.Minimum,"auto.rankCombo.");
+        CommandUI.Button("auto.rank"); CommandUI.Button("auto.rankOff"); CommandUI.Button("auto.pause");
+        if(RankAutoPlay.Active) GUILayout.Label("Active: "+RankAutoPlay.ActiveTarget,MainGUI.Style.Text);
+        GUILayout.Label(RankAutoPlay.Status,MainGUI.Style.Text);
+    }
+    internal static void DrawRank(string current,string prefix)
+    {
+        int selected=System.Array.FindIndex(Ranks,r=>r==current?.Replace("P","+"));
+        int next=GUILayout.SelectionGrid(System.Math.Max(0,selected),Ranks,4,MainGUI.Style.Button);
+        if(next!=selected) Commands.Enqueue(prefix+Ranks[next]);
+    }
+    internal static void DrawCombo(MinimumCombo current,string prefix)
+    {
+        var next=(MinimumCombo)GUILayout.SelectionGrid((int)current,new[]{"Any","FC","FC+","AP","AP+"},3,MainGUI.Style.Button);
+        if(next!=current) Commands.Enqueue(prefix+next);
     }
 }

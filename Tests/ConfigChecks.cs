@@ -6,6 +6,7 @@ namespace MelonLoader
     {
         public static void Msg(string _) { }
         public static void Error(string _) { }
+        public static void Error(Exception _) { }
         public static void Warning(string _) { }
     }
 }

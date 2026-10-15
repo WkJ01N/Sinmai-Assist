@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Text;
 using UnityEngine;
+using SinmaiAssist.Runtime;
 
 namespace SinmaiAssist.GUI;
 
@@ -10,11 +11,14 @@ public class MainGUI
     {
         AutoPlay,
         FastSkip,
+        Batch,
         ChartController,
         DummyLogin,
         UserData,
         Graphic,
-        Debug
+        Debug,
+        Settings,
+        Hotkeys
     }
     
     private const float PanelWidth = 320f;
@@ -22,18 +26,26 @@ public class MainGUI
     
     private Rect _panelWindow;
     private Toolbar _toolbar = Toolbar.AutoPlay;
+    private Vector2 _scroll;
+    private static MainGUI _current;
     
     public static readonly Style Style = new Style();
     
     public MainGUI()
     {
-        
+        _current=this;
+    }
+    internal static void Open(string name)
+    {
+        if(_current==null) return;
+        Commands.Capture.Cancel();
+        _current._toolbar=(Toolbar)Enum.Parse(typeof(Toolbar),name);
+        _current._scroll=Vector2.zero;SinmaiAssist.MainConfig.ModSetting.ShowPanel=true;
     }
 
     public void HandleInput()
     {
-        if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.SinmaiAssist.ShowUserPanel.KeyCode))
-            SinmaiAssist.MainConfig.ModSetting.ShowPanel = !SinmaiAssist.MainConfig.ModSetting.ShowPanel;
+        // Commands.Update dispatches input, including while the panel is hidden.
     }
     
     public void OnGUI()
@@ -43,6 +55,7 @@ public class MainGUI
             return;
         }
 
+        CommandUI.Begin();
         if (SinmaiAssist.MainConfig.ModSetting.ShowPanel)
         {
             string title = BuildInfo.Name + (SinmaiAssist.MainConfig.ModSetting.SafeMode ? " (SafeMode)" : "");
@@ -52,7 +65,13 @@ public class MainGUI
         else
         {
             _panelWindow = new Rect();
+            Commands.TextEditing=false;
+            Commands.Capture.Cancel();
+            if (!Commands.HasUsableKey("panel") && UnityEngine.GUI.Button(new Rect(8,Screen.height-38,160,30),"Open Sinmai-Assist"))
+                Commands.Enqueue("panel");
         }
+        if(SinmaiAssist.MainConfig.ModSetting.ShowPanel) CommandUI.End();
+        BatchPanel.Overlay();
     }
     
     private void MainPanel(int id)
@@ -60,16 +79,22 @@ public class MainGUI
         GUILayout.BeginVertical($"{BuildInfo.Name} {BuildInfo.Version} ({BuildInfo.CommitHash??"NOT SET"})", GUILayout.Height(20f));
         ToolBarPanel();
         GUILayout.EndVertical();
-        GUILayout.BeginVertical(GUILayout.Width(PanelWidth), GUILayout.Height(380f));
+        _scroll=GUILayout.BeginScrollView(_scroll,GUILayout.Width(PanelWidth+30),GUILayout.Height(Mathf.Min(540,Mathf.Max(160,Screen.height-180))));
+        GUILayout.BeginVertical(GUILayout.Width(PanelWidth));
         if (_toolbar == Toolbar.AutoPlay && SinmaiAssist.MainConfig.Cheat.AutoPlay) AutoPlayPanel.OnGUI();
         else if (_toolbar == Toolbar.FastSkip && SinmaiAssist.MainConfig.Cheat.FastSkip) FastSkipPanel.OnGUI();
+        else if (_toolbar == Toolbar.Batch) BatchPanel.OnGUI();
         else if (_toolbar == Toolbar.ChartController && SinmaiAssist.MainConfig.Cheat.ChartController) ChartControllerPanel.OnGUI();
         else if (_toolbar == Toolbar.DummyLogin && SinmaiAssist.MainConfig.Common.DummyLogin.Enable) DummyLoginPanel.OnGUI();
         else if (_toolbar == Toolbar.UserData) UserDataPanel.OnGUI();
         else if (_toolbar == Toolbar.Graphic) GraphicPanel.OnGUI();
         else if (_toolbar == Toolbar.Debug) DebugPanel.OnGUI();
+        else if (_toolbar == Toolbar.Settings) SettingsPanel.OnGUI();
+        else if (_toolbar == Toolbar.Hotkeys) HotkeysPanel.OnGUI();
         else DisablePanel();
         GUILayout.EndVertical();
+        GUILayout.EndScrollView();
+        GUILayout.Label(Commands.Status,new GUIStyle(Style.Text){wordWrap=true},GUILayout.Width(PanelWidth));
         UnityEngine.GUI.DragWindow();
     }
     
@@ -103,7 +128,7 @@ public class MainGUI
 
             GUILayout.EndHorizontal();
         }
-        _toolbar = (Toolbar)selectedToolbar;
+        if(_toolbar!=(Toolbar)selectedToolbar) Commands.Enqueue("panel."+(Toolbar)selectedToolbar);
     }
     
     private void DisablePanel()

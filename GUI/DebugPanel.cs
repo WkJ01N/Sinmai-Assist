@@ -1,66 +1,22 @@
-﻿using System;
-using MAI2.Util;
-using Manager;
-using SinmaiAssist.Cheat;
-using SinmaiAssist.Utils;
+using SinmaiAssist.Runtime;
 using UnityEngine;
 
 namespace SinmaiAssist.GUI;
 
 public class DebugPanel
 {
-    public static bool UnityLogger = false;
+    public static bool UnityLogger;
     public static void OnGUI()
     {
-        GUILayout.Label($"Test Tools", MainGUI.Style.Title);
-        if (GUILayout.Button("TouchArea Display", MainGUI.Style.Button)) Common.InputManager.TouchAreaDisplayButton = true;
-        if (GUILayout.Button("Send Test Message", MainGUI.Style.Button))
-        {
-            GameMessageManager.SendMessage(0,"Hello World!\nMonitorId: 0");
-            GameMessageManager.SendMessage(1,"Hello World!\nMonitorId: 1");
-        }
-        if (GUILayout.Button("Save P1 Option To DefaultOption", MainGUI.Style.Button)) Common.ChangeDefaultOption.SaveOptionFile(0L);
-        if (GUILayout.Button("Save P2 Option To DefaultOption", MainGUI.Style.Button)) Common.ChangeDefaultOption.SaveOptionFile(1L);
-        if (GUILayout.Button("↑ ↓ ↑ ↓", MainGUI.Style.Button)) SoundManager.PlaySE(Mai2.Mai2Cue.Cue.SE_ENTRY_AIME_ERROR, 1);
-        if (GUILayout.Button("Switch Utage Mode", MainGUI.Style.Button)) UnlockUtage.SwitchUtageMode();
-        GUILayout.Label("SpeedHack", MainGUI.Style.Title);
-        bool speedHackEnable = SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable;
-        bool newSpeedHackEnable = GUILayout.Toggle(speedHackEnable, "Enable SpeedHack");
-        if (newSpeedHackEnable != speedHackEnable)
-        {
-            SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable = newSpeedHackEnable;
-            if (newSpeedHackEnable)
-            {
-                SpeedHack.ApplyCurrentSpeed(true);
-            }
-            else
-            {
-                SpeedHack.ApplySpeed(SpeedHack.DefaultSpeed, true);
-                SpeedHack.ApplyGlobalSpeedState();
-            }
-        }
-
-        bool prevGuiEnabled = UnityEngine.GUI.enabled;
-        UnityEngine.GUI.enabled = SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable;
-        bool globalSpeedEnable = SinmaiAssist.MainConfig.Cheat.SpeedHack.EnableGlobalSpeed;
-        bool newGlobalSpeedEnable = GUILayout.Toggle(globalSpeedEnable, "Enable Global Speed");
-        if (newGlobalSpeedEnable != globalSpeedEnable)
-        {
-            SinmaiAssist.MainConfig.Cheat.SpeedHack.EnableGlobalSpeed = newGlobalSpeedEnable;
-            SpeedHack.ApplyGlobalSpeedState();
-        }
-        UnityEngine.GUI.enabled = prevGuiEnabled;
-
-        GUILayout.Label($"Current Speed: x{SinmaiAssist.MainConfig.Cheat.SpeedHack.SpeedMultiplier:0.0}", MainGUI.Style.Text);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("-0.1", MainGUI.Style.Button)) SpeedHack.DecreaseSpeed();
-        if (GUILayout.Button("+0.1", MainGUI.Style.Button)) SpeedHack.IncreaseSpeed();
-        if (GUILayout.Button("Reset", MainGUI.Style.Button)) SpeedHack.ResetSpeed();
-        GUILayout.EndHorizontal();
-        GUILayout.Label($"GUI Toggle", MainGUI.Style.Title);
-        if (GUILayout.Button("Toggle Show Info", MainGUI.Style.Button)) SinmaiAssist.MainConfig.ModSetting.ShowInfo = !SinmaiAssist.MainConfig.ModSetting.ShowInfo;
-        if (GUILayout.Button("Toggle Show FPS", MainGUI.Style.Button)) SinmaiAssist.MainConfig.Common.ShowFPS = !SinmaiAssist.MainConfig.Common.ShowFPS;
-        UnityLogger = GUILayout.Toggle(UnityLogger, "Log Unity Debug?");
-        SinmaiAssist.MainConfig.Common.UnityLogger.Enable = UnityLogger;
+        GUILayout.Label("Test tools",MainGUI.Style.Title);
+        foreach(var id in new[]{"debug.touch","debug.message","debug.option0","debug.option1","debug.sound","debug.utage"}) CommandUI.Button(id);
+        var speed=SinmaiAssist.MainConfig.Cheat.SpeedHack;
+        GUILayout.Label("SpeedHack",MainGUI.Style.Title);
+        CommandUI.Toggle("speed.toggle",speed.Enable,"Enable SpeedHack");
+        CommandUI.Toggle("speed.global",speed.EnableGlobalSpeed,"Enable global speed");
+        GUILayout.Label($"Current speed: x{speed.SpeedMultiplier:0.0}",MainGUI.Style.Text);
+        GUILayout.BeginHorizontal();CommandUI.Button("speed.down","-0.1");CommandUI.Button("speed.up","+0.1");CommandUI.Button("speed.reset","Reset");GUILayout.EndHorizontal();
+        CommandUI.Button("info");CommandUI.Button("fps");
+        CommandUI.Toggle("debug.log",SinmaiAssist.MainConfig.Common.UnityLogger.Enable,"Log Unity debug");
     }
 }

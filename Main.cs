@@ -66,6 +66,8 @@ namespace SinmaiAssist
                 MainConfig = _mainConfigManager.GetConfig();
                 KeyBindConfig = _keyBindConfigManager.GetConfig();
                 EnsureConfigDefaults();
+                Runtime.SettingsStore.Initialize(BuildInfo.Name);
+                Runtime.GameActions.Initialize();
                 DummyLoginPanel.DummyUserId = MainConfig.Common.DummyLogin.DefaultUserId.ToString();
                 DebugPanel.UnityLogger = MainConfig.Common.UnityLogger.Enable;
                 MelonLogger.Msg("Config Load Complete.");
@@ -193,9 +195,18 @@ namespace SinmaiAssist
             if (MainConfig.Fix.RewriteNoteJudgeTiming.Enable) Patch(typeof(RewriteNoteJudgeTiming));
 
             //Cheat
-            if (MainConfig.Cheat.AutoPlay) Patch(typeof(AutoPlay));
+            bool autoReady=MainConfig.Cheat.AutoPlay && AutoPlay.Prepare() && Patch(typeof(AutoPlay));
             if (MainConfig.Cheat.FastSkip) Patch(typeof(FastSkip));
-            if (MainConfig.Cheat.ChartController) Patch(typeof(ChartController));
+            if (PlaySession.Compatible) PlaySession.Installed=Patch(typeof(PlaySession));
+            if (MainConfig.Cheat.ChartController && PlaySession.CanPractice && PlaySession.Installed) PracticeLoop.Installed=Patch(typeof(PracticeLoop));
+            if (autoReady && RankAutoPlay.Compatible)
+            {
+                bool score=Patch(typeof(RankAutoPlay));
+                bool judge=Patch(typeof(RankJudgeResultPatch));
+                bool input=Patch(typeof(RankInputPatch));
+                bool scope=Patch(typeof(RankNoteInputScope));
+                RankAutoPlay.Installed=score && judge && input && scope && PlaySession.Installed;
+            }
             if (MainConfig.Cheat.AllCollection) Patch(typeof(AllCollection));
             if (MainConfig.Cheat.UnlockMusic.Enable) Patch(typeof(UnlockMusic));
             if (MainConfig.Cheat.UnlockMaster.Enable) Patch(typeof(UnlockMaster));
@@ -211,6 +222,8 @@ namespace SinmaiAssist
             Patch(typeof(SpeedHackNotesClockPatch));
             Patch(typeof(SpeedHackAudioClockPatch));
             Patch(typeof(SpeedHackBgmPitchPatch));
+            if(PracticeAudio.Compatible)PracticeAudio.Installed=Patch(typeof(PracticeAudio));
+            if(MainConfig.Cheat.FastSkip && PlaySession.Installed)BatchController.Installed=Patch(typeof(BatchController));
 
             // 默认加载项
             Patch(typeof(PrintUserData));
@@ -222,7 +235,10 @@ namespace SinmaiAssist
         }
         public override void OnApplicationQuit()
         {
+            BatchController.Run.Shutdown();
             FastSkip.CancelPending();
+            RankAutoPlay.Cancel(true);
+            PracticeAudio.Release();
             SpeedHack.RestoreGlobalSpeed();
             Application.logMessageReceived -= OnLogMessageReceived;
         }
@@ -234,16 +250,12 @@ namespace SinmaiAssist
                 return;
             }
 
-            _mainGUI.HandleInput();
+            Runtime.Commands.Update();
+            BatchController.Tick();
             ShowVersionInfo.Update();
             if (MainConfig.ModSetting.SafeMode) { SpeedHack.RestoreGlobalSpeed(); return; }
-            if (MainConfig.Cheat.AutoPlay) AutoPlay.HandleInput();
             SpeedHack.ApplyGlobalSpeedState();
 
-            if (MainConfig.Cheat.SpeedHack.Enable)
-            {
-                SpeedHack.OnUpdate();
-            }
         }
 
         public override void OnGUI()

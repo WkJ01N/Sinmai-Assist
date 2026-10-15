@@ -17,19 +17,21 @@ public class DummyLoginPanel
     public static void OnGUI()
     {
         GUILayout.Label("Code:", MainGUI.Style.Text);
-        DummyLoginCode = GUILayout.TextArea(DummyLoginCode, GUILayout.Height(100f));
-        if (GUILayout.Button("Code Login", MainGUI.Style.Button))
-        {
-            CodeLoginFlag = true;
-            if(SinmaiAssist.GameID != "SDGB")DummyAimeLogin.ReadCard();
-        }
+        DummyLoginCode = CommandUI.Area(DummyLoginCode, GUILayout.Height(100f));
+        CommandUI.Button("login.code","Code Login");
         GUILayout.Label("UserID:", MainGUI.Style.Text);
-        DummyUserId = GUILayout.TextField(DummyUserId, GUILayout.Height(20f));
-        if (GUILayout.Button("UserId Login", MainGUI.Style.Button))
-        {
-            UserIdLoginFlag = true;
-            if(SinmaiAssist.GameID != "SDGB")DummyAimeLogin.ReadCard("12312312312312312312", DummyLoginCode);
-        }
+        DummyUserId = CommandUI.Text(DummyUserId, GUILayout.Height(20f));
+        CommandUI.Button("login.id","UserId Login");
         GUILayout.Label($"AMDaemon BootTime: {AMDaemon.Allnet.Auth.AuthTime}", MainGUI.Style.Text);
+    }
+    internal static void LoginCode()
+    {
+        CodeLoginFlag=true;
+        if(SinmaiAssist.GameID!="SDGB") DummyAimeLogin.ReadCard();
+    }
+    internal static void LoginId()
+    {
+        UserIdLoginFlag=true;
+        if(SinmaiAssist.GameID!="SDGB") DummyAimeLogin.ReadCard("12312312312312312312",DummyLoginCode);
     }
 }

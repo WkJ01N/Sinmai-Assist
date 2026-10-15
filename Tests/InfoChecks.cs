@@ -74,6 +74,26 @@ internal static class InfoChecks
         Assert(!reader.TypeReferences.Any(h => TypeName(reader, h) == "AMDaemon.SerialId"),
             "new DLL must not encode an external SerialId class/struct assumption");
         Assert(KeychipReturnKind(reader) == null, "new DLL must not directly call get_KeychipId");
+        const string author="WYH2004 (Slim) & Error063 | Modified by WkJ01N";
+        bool melon=false,copyright=false;
+        foreach(var handle in reader.CustomAttributes)
+        {
+            var attribute=reader.GetCustomAttribute(handle);
+            if(attribute.Constructor.Kind!=HandleKind.MemberReference)continue;
+            var constructor=reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor);
+            if(constructor.Parent.Kind!=HandleKind.TypeReference)continue;
+            string name=TypeName(reader,(TypeReferenceHandle)constructor.Parent);var blob=reader.GetBlobReader(attribute.Value);
+            if(name=="MelonLoader.MelonInfoAttribute")
+            {
+                Assert(blob.ReadUInt16()==1,"MelonInfo attribute prolog");
+                blob.ReadSerializedString();blob.ReadSerializedString();blob.ReadSerializedString();
+                melon=blob.ReadSerializedString()==author;
+            }
+            if(name=="System.Reflection.AssemblyCopyrightAttribute")
+            {Assert(blob.ReadUInt16()==1,"copyright attribute prolog");copyright=blob.ReadSerializedString()=="Created by "+author;}
+        }
+        Assert(melon&&copyright,"loader and author metadata retain original credits plus exact modifier signature");
+        Assert(System.Text.Encoding.Unicode.GetString(File.ReadAllBytes(modPath)).Contains(author),"startup author literal retained");
         byte runtimeKind = SerialIdKind(runtimeAmDaemonPath);
         if (legacyModPath != null)
         {
@@ -84,6 +104,7 @@ internal static class InfoChecks
             Console.WriteLine($"PASS: reproduced legacy return-type mismatch (0x{oldKind:X2} vs runtime 0x{runtimeKind:X2}) through metadata.");
         }
         Console.WriteLine("PASS: built DLL has no direct SerialId / Keychip getter signature; runtime AMDaemon type inspected.");
+        Console.WriteLine("PASS: original authors and exact Modified by WkJ01N credit in loader/author metadata and startup banner literal.");
     }
 
     private static byte SerialIdKind(string path)

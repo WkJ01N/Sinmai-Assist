@@ -53,46 +53,45 @@ public class UserDataPanel
             GUILayout.BeginHorizontal();
             int typeId = (int)type;
             GUILayout.Label(type.ToString(), new GUIStyle(MainGUI.Style.Text){fixedWidth = 50});
-            _userInputId[typeId] = GUILayout.TextField(_userInputId[typeId]);
-            if (GUILayout.Button("Add", new GUIStyle(MainGUI.Style.Button){ fixedWidth = 50}))
-            {
-                AddCollections(0, type, _userInputId[typeId]);
-                AddCollections(1, type, _userInputId[typeId]);
-            }
+            _userInputId[typeId] = CommandUI.Text(_userInputId[typeId]);
+            CommandUI.Button("user.add"+type,"Add",GUILayout.Width(50));
             GUILayout.EndHorizontal();
         }
-        _isNewItem = GUILayout.Toggle(_isNewItem, "Is New Item");
+        CommandUI.Toggle("user.new",_isNewItem,"Is New Item");
         
         GUILayout.Label("Unlock Music", MainGUI.Style.Title);
         GUILayout.BeginHorizontal();
         GUILayout.Label("Music", new GUIStyle(MainGUI.Style.Text){fixedWidth = 50});
-        _userInputId[0] = GUILayout.TextField(_userInputId[0]);
-        if (GUILayout.Button("Add", new GUIStyle(MainGUI.Style.Button){ fixedWidth = 50}))
-        {
-            UnlockMusic(0, _userInputId[0]);
-            UnlockMusic(1, _userInputId[0]);
-        }
+        _userInputId[0] = CommandUI.Text(_userInputId[0]);
+        CommandUI.Button("user.addMusic","Add",GUILayout.Width(50));
         GUILayout.EndHorizontal();
         
         GUILayout.Label("MaiMile", MainGUI.Style.Title);
         GUILayout.BeginHorizontal();
         GUILayout.Label("MaiMile", new GUIStyle(MainGUI.Style.Text){fixedWidth = 50});
-        _userInputId[6] = GUILayout.TextField(_userInputId[6]);
-        if (GUILayout.Button("Add", new GUIStyle(MainGUI.Style.Button){ fixedWidth = 50}))
-        {
-            AddMaiMile(0, _userInputId[6]);
-            AddMaiMile(1, _userInputId[6]);
-        }
+        _userInputId[6] = CommandUI.Text(_userInputId[6]);
+        CommandUI.Button("user.addMaiMile","Add",GUILayout.Width(50));
         GUILayout.EndHorizontal();
         
         GUILayout.Label("User Data Backup", MainGUI.Style.Title);
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("1P", MainGUI.Style.Button)) User.ExportBackupData(0);
-        if (GUILayout.Button("2P", MainGUI.Style.Button)) User.ExportBackupData(1);
+        CommandUI.Button("user.export0","1P");
+        CommandUI.Button("user.export1","2P");
         GUILayout.EndHorizontal();
         
     }
 
+    internal static void ToggleNew() { _isNewItem=!_isNewItem; }
+    internal static void ExecuteAdd(string item)
+    {
+        for(int p=0;p<2;p++)
+        {
+            if(!Singleton<UserDataManager>.Instance.GetUserData(p).IsEntry) continue;
+            if(item=="Music") UnlockMusic(p,_userInputId[0]);
+            else if(item=="MaiMile") AddMaiMile(p,_userInputId[6]);
+            else {var type=(CollectionType)Enum.Parse(typeof(CollectionType),item);AddCollections(p,type,_userInputId[(int)type]);}
+        }
+    }
     private static void AddCollections(long index, CollectionType type, string input)
     {
         UserData userData = Singleton<UserDataManager>.Instance.GetUserData(index);

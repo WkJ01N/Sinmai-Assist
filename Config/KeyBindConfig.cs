@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using MelonLoader;
 using UnityEngine;
 using YamlDotNet.Core;
@@ -9,6 +10,7 @@ namespace SinmaiAssist.Config;
 
 public class KeyBindConfig
 {
+    public Dictionary<string, Key> Actions { get; set; } = new Dictionary<string, Key>();
     public AutoPlayConfig AutoPlay { get; set; } = new AutoPlayConfig();
     public ChartControllerConfig ChartController { get; set; } = new ChartControllerConfig();
     public SpeedHackConfig SpeedHack { get; set; } = new SpeedHackConfig();
@@ -16,36 +18,36 @@ public class KeyBindConfig
 
     public class AutoPlayConfig
     {
-        public Key None { get; set; } = "N";
-        public Key Critical { get; set; } = "F";
+        public Key None { get; set; } = "None";
+        public Key Critical { get; set; } = "None";
         public Key Perfect { get; set; } = "None";
-        public Key Great { get; set; } = "O";
-        public Key Good { get; set; } = "P";
-        public Key Random { get; set; } = "K";
-        public Key RandomAllPerfect { get; set; } = "G";
-        public Key RandomFullComboPlus { get; set; } = "H";
-        public Key RandomFullCombo { get; set; } = "J";
+        public Key Great { get; set; } = "None";
+        public Key Good { get; set; } = "None";
+        public Key Random { get; set; } = "None";
+        public Key RandomAllPerfect { get; set; } = "None";
+        public Key RandomFullComboPlus { get; set; } = "None";
+        public Key RandomFullCombo { get; set; } = "None";
     }
     
     public class ChartControllerConfig
     {
-        public Key Pause { get; set; } = "Enter";
-        public Key Forward { get; set; } = "RightArrow";
-        public Key Backward { get; set; } = "LeftArrow";
-        public Key SetRecord { get; set; } = "DownArrow";
-        public Key ReturnRecord { get; set; } = "UpArrow";
+        public Key Pause { get; set; } = "None";
+        public Key Forward { get; set; } = "None";
+        public Key Backward { get; set; } = "None";
+        public Key SetRecord { get; set; } = "None";
+        public Key ReturnRecord { get; set; } = "None";
     }
 
     public class SpeedHackConfig
     {
-        public Key Increase { get; set; } = "KeypadPlus";
-        public Key Decrease { get; set; } = "KeypadMinus";
-        public Key Reset { get; set; } = "KeypadMultiply";
+        public Key Increase { get; set; } = "None";
+        public Key Decrease { get; set; } = "None";
+        public Key Reset { get; set; } = "None";
     }
 
     public class SinmaiAssistConfig
     {
-        public Key ShowUserPanel { get; set; } = "Backspace";
+        public Key ShowUserPanel { get; set; } = "None";
     }
     
     public class Key
@@ -67,7 +69,7 @@ public class KeyBindConfig
             {
                 if (_keyCode == "None")
                     return UnityEngine.KeyCode.None;
-                if (Enum.TryParse<KeyCode>(_keyCode, out var code))
+                if (Enum.TryParse<KeyCode>(_keyCode, out var code) && Enum.IsDefined(typeof(KeyCode),code) && code>=KeyCode.None && code<KeyCode.Mouse0)
                     return code;
                 
                 return KeyCode.None;

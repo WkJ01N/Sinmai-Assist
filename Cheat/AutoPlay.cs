@@ -46,16 +46,7 @@ namespace SinmaiAssist.Cheat
 
         public static void HandleInput()
         {
-            var keys = SinmaiAssist.KeyBindConfig.AutoPlay;
-            if (DebugInput.GetKeyDown(keys.None.KeyCode)) autoPlayMode = AutoPlayMode.None;
-            if (DebugInput.GetKeyDown(keys.Critical.KeyCode)) autoPlayMode = AutoPlayMode.Critical;
-            if (DebugInput.GetKeyDown(keys.Perfect.KeyCode)) autoPlayMode = AutoPlayMode.Perfect;
-            if (DebugInput.GetKeyDown(keys.Great.KeyCode)) autoPlayMode = AutoPlayMode.Great;
-            if (DebugInput.GetKeyDown(keys.Good.KeyCode)) autoPlayMode = AutoPlayMode.Good;
-            if (DebugInput.GetKeyDown(keys.Random.KeyCode)) autoPlayMode = AutoPlayMode.Random;
-            if (DebugInput.GetKeyDown(keys.RandomAllPerfect.KeyCode)) autoPlayMode = AutoPlayMode.RandomAllPerfect;
-            if (DebugInput.GetKeyDown(keys.RandomFullComboPlus.KeyCode)) autoPlayMode = AutoPlayMode.RandomFullComboPlus;
-            if (DebugInput.GetKeyDown(keys.RandomFullCombo.KeyCode)) autoPlayMode = AutoPlayMode.RandomFullCombo;
+            // Kept as a compatibility hook; Runtime.Commands owns keyboard dispatch.
         }
 
         public enum AutoPlayMode
@@ -68,7 +59,8 @@ namespace SinmaiAssist.Cheat
             Random,
             RandomAllPerfect,
             RandomFullComboPlus,
-            RandomFullCombo
+            RandomFullCombo,
+            Rank
         }
 
         private static readonly ReadOnlyCollection<NoteJudge.ETiming> RandCriticalTiming = Array.AsReadOnly(new NoteJudge.ETiming[5]
@@ -100,7 +92,7 @@ namespace SinmaiAssist.Cheat
 
         public static bool IsAutoPlay()
         {
-            return autoPlayMode != AutoPlayMode.None;
+            return !BatchController.Active && autoPlayMode != AutoPlayMode.None && (autoPlayMode != AutoPlayMode.Rank || RankAutoPlay.Active);
         }
 
         [HarmonyPrefix]
@@ -116,7 +108,7 @@ namespace SinmaiAssist.Cheat
         public static void AutoPlayUpdate()
         {
             var mode = GameManager.AutoPlay;
-            if (DisableUpdate) return;
+            if (BatchController.Active || DisableUpdate || RankAutoPlay.Requested) return;
             autoPlayMode = (AutoPlayMode)mode;
         }
 
@@ -135,6 +127,7 @@ namespace SinmaiAssist.Cheat
             switch (autoPlayMode)
             {
                 case AutoPlayMode.Critical:
+                case AutoPlayMode.Rank:
                     __result = NoteJudge.ETiming.Critical;
                     break;
                 // 随机Fast或Late
@@ -222,7 +215,11 @@ namespace SinmaiAssist.Cheat
             if ((ETiming)NoteBaseJudgeResultFieldInfo.GetValue(__instance) != ETiming.End) return false;
             if (NotesManager.GetCurrentMsec() > appearMsec - 4.1666665f)
             {
-                if ((autoPlayMode == AutoPlayMode.RandomAllPerfect || autoPlayMode == AutoPlayMode.RandomFullCombo || autoPlayMode == AutoPlayMode.RandomFullComboPlus) && (isExNote || __instance is TouchNoteB))
+                if (RankAutoPlay.TryTiming(__instance, out var planned))
+                {
+                    NoteBaseJudgeResultFieldInfo.SetValue(__instance, planned);
+                }
+                else if ((autoPlayMode == AutoPlayMode.RandomAllPerfect || autoPlayMode == AutoPlayMode.RandomFullCombo || autoPlayMode == AutoPlayMode.RandomFullComboPlus) && (isExNote || __instance is TouchNoteB))
                 {
                     NoteBaseJudgeResultFieldInfo.SetValue(__instance, NoteJudge.ETiming.Critical);
                 }
@@ -259,6 +256,7 @@ namespace SinmaiAssist.Cheat
             judgeTimingDiffMsecField.SetValue(__instance, judgeTimingDiffMsec);
             ETiming judgeResult = (ETiming)judgeResultField.GetValue(__instance);
             judgeResult = (IsAutoPlay() ? GameManager.AutoJudge() : NoteJudge.GetSlideJudgeTiming(ref judgeTimingDiffMsec, Singleton<GamePlayManager>.Instance.GetGameScore(__instance.MonitorId).UserOption.GetJudgeTimingFrame(), (EJudgeType)judgeTypeField.GetValue(__instance), (int)lastWaitTimeForJudgeField.GetValue(__instance)));
+            if (RankAutoPlay.TryTiming(__instance, out var planned)) judgeResult = planned;
 
             if (autoPlayMode == AutoPlayMode.RandomAllPerfect ||
                 autoPlayMode == AutoPlayMode.RandomFullComboPlus ||
@@ -269,7 +267,7 @@ namespace SinmaiAssist.Cheat
 
             if (judgeResult != NoteJudge.ETiming.End)
             {
-                if (judgeResult == NoteJudge.ETiming.TooFast)
+                if (judgeResult == NoteJudge.ETiming.TooFast && !RankAutoPlay.Active)
                 {
                     judgeResult = NoteJudge.ETiming.FastGood;
                 }
@@ -311,6 +309,8 @@ namespace SinmaiAssist.Cheat
             {
                 judgeResult = NoteJudge.ETiming.Critical;
             }
+
+            if (RankAutoPlay.TryTiming(__instance, out var planned)) judgeResult = planned;
             judgeResultField.SetValue(__instance, judgeResult);
 
             TouchSensorType touchArea = (TouchSensorType)TouchAreaField.GetValue(__instance);

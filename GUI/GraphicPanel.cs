@@ -12,29 +12,35 @@ public class GraphicPanel
     
     public static void OnGUI()
     {
-        if (GUILayout.Button("Toggle full screen", MainGUI.Style.Button, GUILayout.Height(50))) Graphic.ToggleFullscreen();
+        CommandUI.Button("graphic.fullscreen",null,GUILayout.Height(50));
         GUILayout.Label($"Custom Graphic Settings", MainGUI.Style.Title);
         GUILayout.BeginHorizontal();
         GUILayout.BeginVertical();
         GUILayout.Label($"Width:", MainGUI.Style.Text);
-        screenWidth = GUILayout.TextField(screenWidth);
+        screenWidth = CommandUI.Text(screenWidth);
         GUILayout.EndVertical();
         GUILayout.BeginVertical();
         GUILayout.Label($"Height:", MainGUI.Style.Text);
-        screenHeight = GUILayout.TextField(screenHeight);
+        screenHeight = CommandUI.Text(screenHeight);
         GUILayout.EndVertical();
         GUILayout.BeginVertical();
         GUILayout.Label($"Max FPS (Unlimited is -1):", MainGUI.Style.Text);
-        frameRate = GUILayout.TextField(frameRate);
+        frameRate = CommandUI.Text(frameRate);
         GUILayout.EndVertical();
         GUILayout.EndHorizontal();
-        if (GUILayout.Button("Apply", MainGUI.Style.Button, GUILayout.Height(20)) && int.TryParse(screenWidth, out int widthValue) && int.TryParse(screenHeight, out int heightValue) && int.TryParse(frameRate, out int fpsValue))
+        CommandUI.Button("graphic.apply","Apply");
+    }
+    internal static void Apply()
+    {
+        if (int.TryParse(screenWidth, out int widthValue) && int.TryParse(screenHeight, out int heightValue) && int.TryParse(frameRate, out int fpsValue))
         {
             if (widthValue >= 360f && heightValue >= 360f)
             {
                 Graphic.SetResolution(widthValue, heightValue);
                 Graphic.SetMaxFrameRate(fpsValue);
             }
+            else throw new System.ArgumentException("Resolution must be at least 360 x 360.");
         }
+        else throw new System.ArgumentException("Enter integer width, height and FPS values.");
     }
 }

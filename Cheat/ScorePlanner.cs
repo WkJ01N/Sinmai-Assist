@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace SinmaiAssist.Cheat;
 
-public enum MinimumCombo { None, FC, FCPlus, AP }
+public enum MinimumCombo { None, FC, FCPlus, AP, APPlus }
 
 // No Unity/game calls: inputs are copied on the game thread; search runs on a worker.
 internal static class ScorePlanner
@@ -18,6 +18,7 @@ internal static class ScorePlanner
         public bool Ex;
         public float Time;
         public bool ForceMiss;
+        public int? FixedTiming;
     }
 
     internal sealed class Request
@@ -28,6 +29,7 @@ internal static class ScorePlanner
         public decimal Lower, Upper;
         public bool IncludeUpper;
         public bool PreferUpper;
+        public bool ExcludeTheory;
         public int Seed;
         public int NodeLimit = 500000;
         public int TimeLimitMs = 1000;
@@ -74,8 +76,12 @@ internal static class ScorePlanner
             if (note.ForceMiss && request.Minimum != MinimumCombo.None)
                 return Fail("Forced Miss conflicts with the minimum combo restriction.");
             var equivalent = new Dictionary<long, List<int>>();
+            if (note.FixedTiming.HasValue && (note.FixedTiming < 0 || note.FixedTiming >= 15 ||
+                !Allowed(note.FixedTiming.Value, request.Minimum, note.Ex)))
+                return Fail("Existing judgements violate the requested combo restriction.");
             for (int timing = 0; timing < 15; timing++)
             {
+                if (note.FixedTiming.HasValue && timing != note.FixedTiming.Value) continue;
                 bool miss = timing == 0 || timing == 14;
                 if (note.ForceMiss ? !miss : !Allowed(timing, request.Minimum, note.Ex)) continue;
                 long loss = checked(100 * (bonus == 0 ? 1 : bonus) *
@@ -83,6 +89,7 @@ internal static class ScorePlanner
                 if (note.Kind == 3)
                     loss = checked(loss + normal * (request.Scores[5, 7] - (long)request.Scores[5, timing]));
                 if (loss < 0) return Fail("Unsupported scoring table.");
+                if (request.Minimum == MinimumCombo.APPlus && loss != 0) continue;
                 if (!equivalent.TryGetValue(loss, out var timings)) equivalent[loss] = timings = new List<int>();
                 timings.Add(timing);
                 divisor = Gcd(divisor, loss);
@@ -97,6 +104,7 @@ internal static class ScorePlanner
         decimal rawLow = (perfect - request.Upper * denominator) / divisor;
         decimal rawHigh = (perfect - request.Lower * denominator) / divisor;
         long low = Math.Max(0, (long)(request.IncludeUpper ? decimal.Ceiling(rawLow) : decimal.Floor(rawLow) + 1));
+        if (request.ExcludeTheory) low = Math.Max(1, low);
         long high = (long)decimal.Floor(rawHigh);
         if (high < low) return Fail("No achievable score in this rank interval.");
 
@@ -191,7 +199,7 @@ internal static class ScorePlanner
         if (timing == 0 || timing == 14) return false;
         if (minimum == MinimumCombo.FC) return true;
         if (timing == 1 || timing == 13) return false;
-        return minimum != MinimumCombo.AP || (timing >= 5 && timing <= 9);
+        return minimum < MinimumCombo.AP || (timing >= 5 && timing <= 9);
     }
 
     private static Result Fail(string message) => new Result { Error = message };

@@ -18,7 +18,7 @@ namespace SinmaiAssist.Config
         
         public ConfigManager(string configPath = "config.yml", IYamlTypeConverter customConverter = null)
         {
-            _configPath = configPath;
+            _configPath = Path.GetFullPath(configPath);
             _customConverter = customConverter;
             InitConfig();
         }
@@ -88,7 +88,7 @@ namespace SinmaiAssist.Config
             return builder.Build();
         }
 
-        private void SaveConfig()
+        public void SaveConfig()
         {
             var directory = Path.GetDirectoryName(_configPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -96,7 +96,7 @@ namespace SinmaiAssist.Config
 
             var serializer = CreateSerializer();
             var yaml = serializer.Serialize(_config);
-            File.WriteAllText(_configPath, yaml);
+            AtomicConfigFile.Write(_configPath, yaml);
         }
 
         

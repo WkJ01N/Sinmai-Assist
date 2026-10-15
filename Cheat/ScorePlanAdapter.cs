@@ -46,14 +46,14 @@ internal static class ScorePlanAdapter
         return true;
     }
 
-    public static Plan[] Capture(FastSkip.SkipMode mode, int custom, bool forceMiss)
+    public static Plan[] Capture(FastSkip.SkipMode mode, int custom, bool forceMiss, string targetRank = null, MinimumCombo? minimum = null, bool lockJudged = false)
     {
         var config = SinmaiAssist.MainConfig.Cheat.RandomSkip;
         decimal lower = 0, upper = 101;
         bool highest = true;
         if (mode == FastSkip.SkipMode.Random)
         {
-            string rankText = (config.TargetRank ?? "SSS").Replace("+", "P");
+            string rankText = (targetRank ?? config.TargetRank ?? "SSS").Replace("+", "P");
             if (!Enum.TryParse("Rank_" + rankText, true, out MusicClearrankID rank) || !rank.IsValid())
                 throw new InvalidOperationException("Invalid randomSkip.targetRank.");
             lower = GameManager.ConvAchiveIntToDecimal(rank.GetAchvement());
@@ -73,9 +73,11 @@ internal static class ScorePlanAdapter
             var snapshot = notes.Where(n => n != null && !n.type.isConnectSlide() &&
                 GamePlayManager.NoteType2ScoreType(n.type) < NoteScore.EScoreType.BreakBonus)
                 .Select(n => new ScorePlanner.Note { Index = n.indexNote,
-                    Kind = (int)GamePlayManager.NoteType2ScoreType(n.type), Ex = n.type.isEx() || n.type.isExBreak(), Time = EndTime(n) }).ToArray();
+                    Kind = (int)GamePlayManager.NoteType2ScoreType(n.type), Ex = n.type.isEx() || n.type.isExBreak(), Time = EndTime(n),
+                    FixedTiming = lockJudged && score.GetScoreAt(n.indexNote).Judged ? score.GetScoreAt(n.indexNote).Timing : (int?)null }).ToArray();
             if (snapshot.Length == 0 || snapshot.Length != score.ScoreTotal.GetAllNoteNum()) throw new InvalidOperationException("Unsupported chart note layout.");
             if (notes.Any(n => n == null || n.indexNote < 0 || n.indexNote >= score.GetScoreLength()) ||
+                notes.Where((n,index)=>n.indexNote!=index).Any() ||
                 notes.Select(n => n.indexNote).Distinct().Count() != notes.Count)
                 throw new InvalidOperationException("Unsupported note indices.");
             long total = snapshot.Sum(n => (long)table[n.Kind, 7]);
@@ -83,7 +85,7 @@ internal static class ScorePlanAdapter
             if (total != score.ScoreTotal._allPerfectScore || bonus != score.ScoreTotal._breakBonusScore)
                 throw new InvalidOperationException("Chart totals do not match the game scoring table.");
             var request = new ScorePlanner.Request { Notes = snapshot, Scores = table,
-                Minimum = config.MinimumCombo, Lower = lower, Upper = upper, IncludeUpper = highest,
+                Minimum = minimum ?? config.MinimumCombo, Lower = lower, Upper = upper, IncludeUpper = highest,
                 Seed = Guid.NewGuid().GetHashCode() };
             if (mode == FastSkip.SkipMode.Custom)
             {
@@ -101,7 +103,7 @@ internal static class ScorePlanAdapter
         return plans.ToArray();
     }
 
-    private static float EndTime(NoteData note)
+    internal static float EndTime(NoteData note)
     {
         float time = Math.Max(note.time.msec, note.end.msec);
         var children = new Stack<NoteData>(note.child);
@@ -113,6 +115,31 @@ internal static class ScorePlanAdapter
             foreach (var next in child.child) children.Push(next);
         }
         return time;
+    }
+
+    internal static void ClearCounters(GameScoreList score)
+    {
+        foreach (var field in CounterFields) field.SetValue(score, 0u);
+        ResetCombo.SetValue(score, false);
+    }
+    internal static void ClearRound(int player)
+    {
+        var score = Singleton<GamePlayManager>.Instance.GetGameScore(player);
+        var shadow = new GameScoreList(player);
+        CopyFields(score, shadow);
+        var empty = new JudgeResultSt[score.GetScoreLength()];
+        var notes = NotesManager.Instance(player).getReader().GetNoteList();
+        for (int i = 0; i < empty.Length; i++)
+        {
+            empty[i].Type = NoteScore.EScoreType.End;
+            empty[i].Timing = 15;
+            empty[i].Judged = i < notes.Count && notes[i].type.isConnectSlide();
+        }
+        Results.SetValue(shadow, empty);
+        ClearCounters(shadow);
+        shadow.CalcUpdate(); shadow.UpdateAfter();
+        CopyFields(shadow, score);
+        ChainCounter.SetValue(Singleton<GamePlayManager>.Instance, 0u);
     }
 
     public static void Apply(Plan[] plans)
@@ -166,6 +193,8 @@ internal static class ScorePlanAdapter
             {
                 var shadow = shadows[plan.Player];
                 shadow.CalcUpdate();
+                if((int)shadow.ComboType<(int)plan.Request.Minimum || (plan.Request.ExcludeTheory&&(int)shadow.ComboType==4))
+                    throw new InvalidOperationException("Generated result failed native combo validation.");
                 if (Math.Abs(shadow.GetAchivement() - plan.Result.Achievement) > 0.000000000001m ||
                     shadow.GetAchivement() < plan.Request.Lower ||
                     (plan.Request.IncludeUpper ? shadow.GetAchivement() > plan.Request.Upper : shadow.GetAchivement() >= plan.Request.Upper))

@@ -22,18 +22,7 @@ public static class SpeedHack
 
     public static void OnUpdate()
     {
-        if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.SpeedHack.Increase.KeyCode))
-        {
-            IncreaseSpeed();
-        }
-        else if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.SpeedHack.Decrease.KeyCode))
-        {
-            DecreaseSpeed();
-        }
-        else if (DebugInput.GetKeyDown(SinmaiAssist.KeyBindConfig.SpeedHack.Reset.KeyCode))
-        {
-            ResetSpeed();
-        }
+        // Kept as a compatibility hook; Runtime.Commands owns keyboard dispatch.
     }
 
     public static void IncreaseSpeed()
@@ -62,11 +51,13 @@ public static class SpeedHack
         clampedSpeed = Mathf.Round(clampedSpeed * 10f) / 10f;
         SinmaiAssist.MainConfig.Cheat.SpeedHack.SpeedMultiplier = clampedSpeed;
 
+        if (PlaySession.Owner != null) NotesManager.UpdateTimer();
+        SpeedHackAudioClockPatch.Flush();
         ApplyGlobalSpeedState();
 
         try
         {
-            float currentPitchCents = SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable ? GetPitchCents() : 0f;
+            float currentPitchCents = PlaybackRate.MusicPitch;
             SpeedHackBgmPitchPatch.UpdateActiveBgmPitch(currentPitchCents);
         }
         catch (Exception e)
@@ -88,7 +79,7 @@ public static class SpeedHack
     public static bool ShouldScaleGameClock()
     {
         var config = SinmaiAssist.MainConfig.Cheat.SpeedHack;
-        return !SinmaiAssist.MainConfig.ModSetting.SafeMode && config.Enable && (IsInChartPlay() || config.EnableGlobalSpeed);
+        return !SinmaiAssist.MainConfig.ModSetting.SafeMode && (PracticeLoop.Session || config.Enable && (IsInChartPlay() || config.EnableGlobalSpeed));
     }
 
     public static bool ShouldApplyTimeScale()
@@ -140,7 +131,7 @@ internal static class SpeedHackGameClockPatch
         {
             return;
         }
-        __result *= SpeedHack.GetCurrentSpeed();
+        __result *= PlaybackRate.Effective;
     }
 
     [HarmonyPostfix]
@@ -151,7 +142,7 @@ internal static class SpeedHackGameClockPatch
         {
             return;
         }
-        __result = (long)(__result * SpeedHack.GetCurrentSpeed());
+        __result = (long)(__result * PlaybackRate.Effective);
     }
 
     [HarmonyPostfix]
@@ -162,128 +153,7 @@ internal static class SpeedHackGameClockPatch
         {
             return;
         }
-        __result *= SpeedHack.GetCurrentSpeed();
-    }
-}
-
-internal static class SpeedHackNotesClockPatch
-{
-    private static readonly FieldInfo CurMSecField = AccessTools.Field(typeof(NotesManager), "_curMSec");
-    private static readonly FieldInfo MsecStartGapField = AccessTools.Field(typeof(NotesManager), "_msecStartGap");
-    private static bool _loggedMissingFields;
-    private static bool _loggedFieldsResolved;
-    private static float _lastRealMsec = float.NaN;
-    private static float _timeOffset;
-
-    private static void ResetAccumulators()
-    {
-        _lastRealMsec = float.NaN;
-        _timeOffset = 0f;
-    }
-
-    private static bool TryResolveFields()
-    {
-        if (CurMSecField != null && MsecStartGapField != null)
-        {
-            if (!_loggedFieldsResolved)
-            {
-                _loggedFieldsResolved = true;
-                MelonLogger.Msg("SpeedHack: NotesManager clock fields resolved.");
-            }
-            return true;
-        }
-
-        if (!_loggedMissingFields)
-        {
-            _loggedMissingFields = true;
-            MelonLogger.Warning("SpeedHack: NotesManager _curMSec / _msecStartGap null.");
-        }
-        return false;
-    }
-
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(NotesManager), "StartPlay")]
-    private static void StartPlayPostfix()
-    {
-        ResetAccumulators();
-    }
-
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(NotesManager), "StopPlay")]
-    private static void StopPlayPostfix()
-    {
-        ResetAccumulators();
-    }
-
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(NotesManager), "clearNotes")]
-    private static void ClearNotesPostfix()
-    {
-        ResetAccumulators();
-    }
-
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(NotesManager), "UpdateTimer")]
-    private static void UpdateTimerPostfix()
-    {
-        if (!SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable || !TryResolveFields())
-        {
-            return;
-        }
-
-        try
-        {
-            float realMsec = (float)CurMSecField.GetValue(null);
-            float gap = (float)MsecStartGapField.GetValue(null);
-            float speed = SpeedHack.GetCurrentSpeed();
-
-            if (speed == 1.0f)
-            {
-                ResetAccumulators();
-                _lastRealMsec = realMsec;
-                return;
-            }
-
-            if (float.IsNaN(_lastRealMsec) || realMsec < _lastRealMsec)
-            {
-                _lastRealMsec = realMsec;
-                _timeOffset = 0f;
-            }
-            else
-            {
-                float realDelta = realMsec - _lastRealMsec;
-                if (realDelta > 0f)
-                {
-                    _timeOffset += realDelta * (speed - 1f);
-                }
-                _lastRealMsec = realMsec;
-            }
-
-            CurMSecField.SetValue(null, Mathf.Max(gap, realMsec + _timeOffset));
-        }
-        catch (Exception e)
-        {
-            MelonLogger.Warning($"SpeedHack apply NotesManager scaled msec failed: {e.Message}");
-        }
-    }
-}
-
-internal static class SpeedHackAudioClockPatch
-{
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(SoundCtrl), "GetPlayTiming")]
-    private static void GetPlayTimingPostfix(ref long __result, int playerID)
-    {
-        if (!SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable || __result < 0) return;
-
-        if (playerID != (int)SoundManager.PlayerID.Music &&
-            playerID != (int)SoundManager.PlayerID.Bgm &&
-            playerID != (int)SoundManager.PlayerID.Sound_Sepalate_Right)
-        {
-            return;
-        }
-
-        __result = (long)(__result * SpeedHack.GetCurrentSpeed());
+        __result *= PlaybackRate.Effective;
     }
 }
 
@@ -296,6 +166,7 @@ internal static class SpeedHackBgmPitchPatch
         (int)SoundManager.PlayerID.Sound_Sepalate_Right
     };
 
+    private static float NormalPitch => SinmaiAssist.MainConfig.ModSetting.SafeMode || !SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable ? 0 : SpeedHack.GetPitchCents();
     private static SoundCtrl _activeSoundCtrl;
     private static float _lastPitchCents = float.NaN;
     private static bool _loggedPitchApplied = false;
@@ -312,7 +183,8 @@ internal static class SpeedHackBgmPitchPatch
         }
 
         _activeSoundCtrl = __instance;
-        float pitchCents = SinmaiAssist.MainConfig.Cheat.SpeedHack.Enable ? SpeedHack.GetPitchCents() : 0f;
+        float pitchCents = setting.PlayerID == (int)SoundManager.PlayerID.Music ? PlaybackRate.MusicPitch : NormalPitch;
+        SpeedHackAudioClockPatch.Reset(setting.PlayerID, setting.StartTime);
         ApplyPitch(_activeSoundCtrl, setting.PlayerID, pitchCents, true);
     }
 
@@ -334,13 +206,13 @@ internal static class SpeedHackBgmPitchPatch
 
         for (int i = 0; i < BgmPlayerIds.Length; i++)
         {
-            ApplyPitch(_activeSoundCtrl, BgmPlayerIds[i], pitchCents, hasChange);
+            ApplyPitch(_activeSoundCtrl, BgmPlayerIds[i], BgmPlayerIds[i] == (int)SoundManager.PlayerID.Music ? pitchCents : NormalPitch, hasChange);
         }
 
         _lastPitchCents = pitchCents;
     }
 
-    private static bool IsBgmPlayer(int playerId)
+    internal static bool IsBgmPlayer(int playerId)
     {
         for (int i = 0; i < BgmPlayerIds.Length; i++)
         {

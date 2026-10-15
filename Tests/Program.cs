@@ -12,6 +12,8 @@ internal static class Program
     {
         ConfigChecks.Run();
         InfoChecks.Run();
+        RuntimeChecks.Run();
+        BatchChecks.Run();
         uint[][] rows = {
             new uint[] {0,250,400,400,400,500,500,500,500,500,400,400,400,250,0},
             new uint[] {0,500,800,800,800,1000,1000,1000,1000,1000,800,800,800,500,0},
@@ -21,9 +23,15 @@ internal static class Program
             new uint[] {0,30,40,40,40,50,75,100,75,50,40,40,40,30,0}
         };
         for (int k = 0; k < 6; k++) for (int t = 0; t < 15; t++) Scores[k, t] = rows[k][t];
+        TestFixedJudgements();
+        TestTheoryTargets();
         if (args.Length > 0) { NativeChecks.Run(args[0]); VerifyGameTable(args[0]); }
         if (args.Length > 1) TestRealCharts(args[1]);
-        if (args.Length > 2) InfoChecks.VerifyBinary(args[2], Path.Combine(Path.GetDirectoryName(args[0]), "AMDaemon.NET.dll"), args.Length > 3 ? args[3] : null);
+        if (args.Length > 2)
+        {
+            InfoChecks.VerifyBinary(args[2], Path.Combine(Path.GetDirectoryName(args[0]), "AMDaemon.NET.dll"), args.Length > 3 ? args[3] : null);
+            NativeChecks.CheckSignatures(args[2],args[0]);
+        }
 
         // Exhaustive oracle, including EX and BREAK: compare narrow intervals against
         // every legal judgement combination, rather than duplicating the search.
@@ -82,6 +90,46 @@ internal static class Program
         Console.WriteLine($"PASS: {_checks} assertions; {runs} large-chart cases in {watch.ElapsedMilliseconds} ms.");
     }
 
+    private static void TestFixedJudgements()
+    {
+        var notes=new[]{new ScorePlanner.Note{Index=0,Kind=0,FixedTiming=14},new ScorePlanner.Note{Index=1,Kind=0}};
+        var result=Generate(notes,50,50.000001m,MinimumCombo.None,1);
+        Check(result.Success && result.Timings[0]==14 && result.Timings[1]>=5 && result.Timings[1]<=9,"fixed miss retained and full-chart denominator used");
+        Check(!Generate(notes,99,100,MinimumCombo.None,1).Success,"mid-song unreachable rank rejected");
+        Check(!Generate(notes,0,101,MinimumCombo.FC,1).Success,"past miss rejects FC");
+        notes[0].FixedTiming=1;
+        Check(!Generate(notes,0,101,MinimumCombo.FCPlus,1).Success,"past Good rejects FC+");
+        notes[0].FixedTiming=4;
+        Check(!Generate(notes,0,101,MinimumCombo.AP,1).Success,"past Great rejects AP");
+        notes[0].FixedTiming=7;notes[1].FixedTiming=7;
+        Check(Generate(notes,100,101,MinimumCombo.AP,1).Success,"all fixed valid exact result");
+        notes[1].FixedTiming=15;
+        Check(!Generate(notes,0,101,MinimumCombo.None,1).Success,"invalid fixed timing rejected");
+        notes[0].Kind=3;notes[0].FixedTiming=6;notes[1].FixedTiming=null;
+        result=Generate(notes,0,101,MinimumCombo.None,22);
+        Check(result.Success && result.Timings[0]==6,"fixed BREAK bonus variant retained");
+        Console.WriteLine("PASS: mid-song fixed judgements, historical combo restrictions and full-chart scoring denominator.");
+    }
+
+    private static void TestTheoryTargets()
+    {
+        var notes=new[]{new ScorePlanner.Note{Index=0,Kind=0,FixedTiming=5},new ScorePlanner.Note{Index=1,Kind=3}};
+        var request=new ScorePlanner.Request{Notes=notes,Scores=Scores,Minimum=MinimumCombo.APPlus,Lower=100.5m,Upper=101,IncludeUpper=true};
+        var result=ScorePlanner.Generate(request);
+        Check(result.Success&&result.Achievement==101&&result.Timings[0]==5&&result.Timings[1]==7,"AP+ includes non-critical normal Perfect and full BREAK bonus");
+        notes[1].FixedTiming=6;
+        Check(!ScorePlanner.Generate(request).Success,"BREAK Perfect with partial bonus is not AP+");
+        notes[1].FixedTiming=null;request.Minimum=MinimumCombo.AP;request.ExcludeTheory=true;
+        result=ScorePlanner.Generate(request);
+        Check(result.Success&&result.Achievement<101&&result.Achievement>=100.5m,"ordinary high-rank candidate excludes unselected AP+");
+        notes[1].FixedTiming=7;
+        Check(!ScorePlanner.Generate(request).Success,"all-fixed theoretical score cannot enter an AP+-excluded draw");
+        request.ExcludeTheory=false;request.Minimum=MinimumCombo.APPlus;request.Notes=new[]{new ScorePlanner.Note{Index=0,Kind=0,FixedTiming=6}};
+        request.Lower=100;request.Upper=100;request.IncludeUpper=true;
+        Check(ScorePlanner.Generate(request).Success,"no-BREAK native theory is 100%, not forced to 101%");
+        Console.WriteLine("PASS: AP+ native theoretical-score semantics and exclusion from ordinary probability outcomes.");
+    }
+
     private static ScorePlanner.Result Generate(ScorePlanner.Note[] notes, decimal lower, decimal upper, MinimumCombo combo, int seed, bool inclusive=false)
         => ScorePlanner.Generate(new ScorePlanner.Request {Notes=notes,Scores=Scores,Lower=lower,Upper=upper,Minimum=combo,Seed=seed,IncludeUpper=inclusive});
 
@@ -100,6 +148,7 @@ internal static class Program
                     MinimumCombo.FC => t != 0 && t != 14,
                     MinimumCombo.FCPlus => t >= 2 && t <= 12,
                     MinimumCombo.AP => t >= 5 && t <= 9,
+                    MinimumCombo.APPlus => t>=5 && t<=9 && Scores[notes[i].Kind,t]==Scores[notes[i].Kind,7] && (notes[i].Kind!=3||Scores[5,t]==Scores[5,7]),
                     _ => false
                 };
                 if (allowed) {timings[i]=t; Visit(i+1);}
@@ -127,6 +176,7 @@ internal static class Program
         for(int i=0;i<notes.Length;i++)
         {
             int t=result.Timings[i];
+            Check(!notes[i].FixedTiming.HasValue || notes[i].FixedTiming==t,"fixed judgement retained");
             Check(!notes[i].Ex || t==0 || t==7 || t==14,"EX rule");
             Check(combo==MinimumCombo.None || (t!=0 && t!=14),"FC rule");
             Check(combo<MinimumCombo.FCPlus || (t!=1 && t!=13),"FC+ rule");

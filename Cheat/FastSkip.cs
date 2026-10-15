@@ -62,8 +62,11 @@ internal class FastSkip
     [HarmonyPostfix, HarmonyPatch(typeof(GameProcess), "OnUpdate")]
     public static void Skip(GameProcess __instance)
     {
-        bool requested = SkipButton || DebugInput.GetKeyDown(KeyCode.Space);
+        if(BatchController.Active){SkipButton=false;return;}
+        bool requested = SkipButton;
         SkipButton = false;
+        if (PracticeLoop.Session || RankAutoPlay.IsBusy) { if (requested) Status = "Skip unavailable during practice / rank planning."; return; }
+        if (requested) RankAutoPlay.Cancel(true);
         if (_owner != __instance) OnStart(__instance);
         int sequence = Convert.ToInt32(Sequence.GetValue(__instance));
         if (_completed || sequence < 4 || sequence >= 9 || GameManager.IsNoteCheckMode)
@@ -127,5 +130,10 @@ internal class FastSkip
             container.processManager.SendMessage(messages[i]);
         }
         Release.Invoke(process, null);
+    }
+    internal static void CompleteForBatch(GameProcess process)
+    {
+        if(process==null||!PlaySession.Playing)throw new InvalidOperationException("Batch game process changed before score commit.");
+        Complete(process);
     }
 }
