@@ -48,11 +48,16 @@ internal static class BatchMembers
             }
             Methods[key]=method;
         }
-        return method??throw new MissingMethodException(type.FullName,name);
+        return method??throw new MissingMethodException("Missing native method: "+type.FullName+"."+name+" ("+count+" parameters)");
     }
+    public static object Call(object obj,BatchMethod contract,params object[] args)=>Invoke(obj,contract.Resolve(AccessTools.TypeByName),args);
     public static object Call(object obj,string name,params object[] args)
     {
         var type=obj as System.Type??obj.GetType();var method=Method(type,name,args.Length);
+        return Invoke(obj,method,args);
+    }
+    private static object Invoke(object obj,MethodInfo method,object[] args)
+    {
         var parameters=method.GetParameters();
         for(int i=0;i<args.Length;i++)if(args[i]!=null&&!parameters[i].ParameterType.IsInstanceOfType(args[i]))
             args[i]=parameters[i].ParameterType.IsEnum?Enum.ToObject(parameters[i].ParameterType,args[i]):Convert.ChangeType(args[i],parameters[i].ParameterType);
@@ -63,6 +68,7 @@ internal static class BatchMembers
     public static IEnumerable<object> Items(object collection)=>((IEnumerable)collection).Cast<object>();
     public static void Require(System.Type type,params string[] names)
     {
+        if(type==null)throw new TypeLoadException("Missing native type for members: "+string.Join(", ",names));
         foreach(string name in names)
             if(AccessTools.Field(type,name)==null&&AccessTools.Property(type,name)==null)throw new MissingMemberException(type.FullName,name);
     }
@@ -115,22 +121,9 @@ internal sealed class BatchNative : IBatchRuntime
     {
         try
         {
-            foreach(var requirement in new[]{(typeof(MusicSelectProcess),"OnGameStart",0),(typeof(ResultProcess),"ToNextCheck",0),
-                (typeof(NextTrackProcess),"ProcessingProcess",0),(typeof(GamePlayManager),"RemoveScoreList",1),
-                (typeof(GamePlayManager),"GetScoreListCount",0),(typeof(GamePlayManager),"ClaerLog",0),
-                (typeof(MusicSelectProcess),"GetCurrentDifficulty",1),(typeof(MusicSelectProcess),"GetUserScore",3),
-                (typeof(MusicSelectProcess),"CalcMonitorDifficulty",1),(typeof(MusicSelectProcess),"IsPlayableMusic",1),
-                (typeof(MusicSelectProcess),"TimerCountUp",0),(typeof(MusicSelectProcess),"IsTournamentFolder",1),
-                (typeof(Monitor.NextTrackMonitor),"SetNextTrack",1),(typeof(Monitor.MusicSelectMonitor),"SetDeployList",1),
-                (typeof(Manager.UserData),"IsAimeUser",0),(typeof(UnlockProcess),"OnUpdate",0)})
-                BatchMembers.Method(requirement.Item1,requirement.Item2,requirement.Item3);
-            BatchMembers.Require(typeof(MusicSelectProcess),"_mainSequence","CombineMusicDataList","CategoryNameList","CurrentCategorySelect","CurrentMusicSelect","ScoreType","DifficultySelectIndex","CurrentDifficulty","MonitorArray","TrialPlayIndex");
-            BatchMembers.Require(typeof(NextTrackProcess),"isAddAnim","isAddProcess","_monitors","container","toProcess","_mode");
-            BatchMembers.Require(typeof(RetryWaitProcess),"_state","container");
-            BatchMembers.Require(typeof(Manager.ProcessManager),"_processList");
-            BatchMembers.Require(AccessTools.Inner(typeof(Manager.ProcessManager),"ProcessControle"),"State","Process");
-            BatchMembers.Require(typeof(UnlockProcess),"_state");
-            BatchMembers.Require(typeof(GameManager),"TempMaxTrackCount","MusicTrackNumber","NextMapSelect","NextCharaSelect","IsFreedomTimerPause");
+            foreach(var requirement in BatchInterfaces.FlowMethods)requirement.Resolve(AccessTools.TypeByName);
+            foreach(var requirement in BatchInterfaces.Members)
+                BatchMembers.Require(AccessTools.TypeByName(requirement.Key)??throw new TypeLoadException("Missing native type: "+requirement.Key),requirement.Value);
             if(!ScorePlanAdapter.IsCompatible||!PlaySession.Installed)return "Scoring or timeline module unavailable.";
             BatchPackets.Check();return null;
         }
@@ -204,7 +197,7 @@ internal sealed class BatchNative : IBatchRuntime
             var genre=Singleton<DataManager>.Instance.GetMusicGenre(id);
             if(genre!=null&&!string.IsNullOrEmpty(genre.genreName)&&name.Contains(genre.genreName))return false;
         }
-        return !(bool)AccessTools.Method(typeof(MusicSelectProcess),"IsTournamentFolder",new[]{typeof(string)}).Invoke(Selection,new object[]{name});
+        return !(bool)BatchMembers.Call(Selection,BatchInterfaces.TournamentFolder,name);
     }
     public void Begin(BatchJob job)
     {
@@ -291,7 +284,7 @@ internal sealed class BatchNative : IBatchRuntime
             indexes[p]=difficulty;current.SetValue(Enum.ToObject(current.GetType().GetElementType(),difficulty),p);
         }
         BatchMembers.Call(Selection,"CalcMonitorDifficulty",false);
-        foreach(var monitor in BatchMembers.Items(BatchMembers.Get(Selection,"MonitorArray")))BatchMembers.Call(monitor,"SetDeployList",false);
+        foreach(var monitor in BatchMembers.Items(BatchMembers.Get(Selection,"MonitorArray")))BatchMembers.Call(monitor,BatchInterfaces.DeployList,false,false);
         BatchMembers.Set(Selection,"TrialPlayIndex",0);
         BatchMembers.Call(Selection,"OnGameStart");
         for(int p=0;p<2;p++)if(chart.Difficulty[p]>=0 && (GameManager.SelectMusicID[p]!=song.MusicId||GameManager.SelectDifficultyID[p]!=chart.Difficulty[p]))

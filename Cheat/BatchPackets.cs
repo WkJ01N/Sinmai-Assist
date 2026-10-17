@@ -14,20 +14,22 @@ namespace SinmaiAssist.Cheat;
 
 internal static class BatchPackets
 {
-    private static readonly System.Type All=AccessTools.TypeByName("Net.Packet.Mai2.PacketUpsertUserAll");
-    private static readonly System.Type Log=AccessTools.TypeByName("Net.Packet.Mai2.PacketUploadUserPlaylog");
+    private const string AllType="Net.Packet.Mai2.PacketUpsertUserAll",LogType="Net.Packet.Mai2.PacketUploadUserPlaylog";
+    private static readonly System.Type All=AccessTools.TypeByName(AllType);
+    private static readonly System.Type Log=AccessTools.TypeByName(LogType);
     private static readonly System.Type Helper=AccessTools.TypeByName("Net.Packet.Helper.PacketHelper");
-    private static ConstructorInfo AllConstructor=>All?.GetConstructors().FirstOrDefault(c=>{
-        var p=c.GetParameters();return p.Length==6&&p[0].ParameterType==typeof(int)&&p[1].ParameterType==typeof(ulong)&&p[4].ParameterType==typeof(Action<int>);});
-    private static ConstructorInfo LogConstructor=>Log?.GetConstructors().FirstOrDefault(c=>{
-        var p=c.GetParameters();return p.Length==4&&p[0].ParameterType==typeof(ulong)&&p[2].ParameterType==typeof(Action<int>);});
+    private static ConstructorInfo AllConstructor=>RequireConstructor(All,AllType,typeof(int),typeof(ulong),typeof(Net.VO.Mai2.UserAll),
+        typeof(List<Net.VO.Mai2.UserPlaylog>),typeof(Action<int>),typeof(Action<Net.Packet.PacketStatus>));
+    private static ConstructorInfo LogConstructor=>RequireConstructor(Log,LogType,typeof(ulong),typeof(Net.VO.Mai2.UserPlaylog),
+        typeof(Action<int>),typeof(Action<Net.Packet.PacketStatus>));
+    private static ConstructorInfo RequireConstructor(System.Type type,string typeName,params System.Type[] parameters)=>type?.GetConstructor(parameters)??
+        throw new MissingMethodException("Missing native constructor: "+typeName+"("+string.Join(", ",parameters.Select(p=>p.FullName))+")");
     public static void Check()
     {
-        if(AllConstructor==null||LogConstructor==null||Helper==null)throw new MissingMethodException("SDGB upload snapshot constructors not found.");
-        BatchMembers.Method(All,"ToUserAll",2);BatchMembers.Method(All,"Convert",3);BatchMembers.Method(Helper,"StartPacket",1);
+        _=AllConstructor;_=LogConstructor;
+        foreach(var requirement in BatchInterfaces.UploadMethods)requirement.Resolve(AccessTools.TypeByName);
         if(typeof(UserRate).GetConstructor(new[]{typeof(int),typeof(int),typeof(uint),typeof(uint)})==null)
-            throw new MissingMethodException("Native CN UserRate constructor unavailable.");
-        BatchMembers.Method(AccessTools.TypeByName("Monitor.Entry.Parts.Screens.DoneEntry"),"IsWeekdayBonus",1);
+            throw new MissingMethodException("Missing native constructor: Manager.UserDatas.UserRate(System.Int32, System.Int32, System.UInt32, System.UInt32)");
     }
     public static BatchUpload Capture(string jobId,int transaction,int count,string[] users)
     {

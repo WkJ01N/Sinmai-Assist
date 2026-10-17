@@ -20,6 +20,12 @@ internal static class RankAutoPlay
     public static bool Active => _active != null;
     public static bool IsBusy => _pending != null;
     public static string Status = "";
+    public static string Stage { get; private set; } = "Idle";
+    public static string LastFailure { get; private set; } = "";
+    private static void State(string stage,string message)
+    {Stage=stage;Status=message;MelonLogger.Msg("Rank control ["+stage+"]: "+message);}
+    public static void ReportBlocked(string message)
+    {LastFailure="Could not enable rank control: "+message;State(Active?"Active":"Failed",LastFailure);Runtime.Commands.Status=Status;}
     public static bool Installed;
     public static bool Compatible => ScorePlanAdapter.IsCompatible &&
         AccessTools.Field(typeof(NoteBase),"NoteIndex")?.FieldType==typeof(int) &&
@@ -42,12 +48,18 @@ internal static class RankAutoPlay
         if (PracticeLoop.Session) throw new InvalidOperationException("Restart song to leave practice before rank control.");
         if (IsBusy) throw new InvalidOperationException("Rank plan is already being generated.");
         Requested = true; _needsPlan = true;
-        Status = PlaySession.Playing ? "Preparing rank control..." : "Rank control armed for the next song.";
+        AutoPlay.autoPlayMode=AutoPlay.AutoPlayMode.Rank;
+        State("Armed",PlaySession.Playing ? "Preparing rank control..." : "Rank control armed for the next song.");
     }
     public static void ResetSong()
     {
-        bool armed = Requested;
+        bool armed = Requested || Runtime.AutoPlaySelection.PreferredMode=="Rank";
         Cancel(false); Requested = armed; _needsPlan=armed;
+        if(armed)
+        {
+            AutoPlay.autoPlayMode=AutoPlay.AutoPlayMode.Rank;
+            if(Stage!="Armed")State("Armed","Rank control armed for the next song.");
+        }
     }
     public static void Cancel(bool clearRequest)
     {
@@ -60,14 +72,16 @@ internal static class RankAutoPlay
             if (_owner == PlaySession.Owner && PlaySession.Playing) PlaySession.SetPause(_wasPaused);
         }
         _active=null; Timings.Clear(); _needsPlan=false; _verified=false;
-        if (AutoPlay.autoPlayMode == AutoPlay.AutoPlayMode.Rank) AutoPlay.autoPlayMode=AutoPlay.AutoPlayMode.None;
         if (clearRequest) Requested=false;
+        if (AutoPlay.autoPlayMode == AutoPlay.AutoPlayMode.Rank && !Requested) AutoPlay.autoPlayMode=AutoPlay.AutoPlayMode.None;
+        ActiveTarget=null;
+        State(Requested?"Armed":"Idle",Requested?"Rank control armed for the next song.":"Rank control stopped for this song.");
     }
     public static void Update()
     {
         if (IsBusy)
         {
-            if (_owner != PlaySession.Owner || !PlaySession.Playing) { Cancel(true); Status="Song changed; plan cancelled."; return; }
+            if (_owner != PlaySession.Owner || !PlaySession.Playing) { Cancel(false); return; }
             if (!_pending.IsCompleted) return;
             var task=_pending; _pending=null;
             _cancel.Dispose(); _cancel=null;
@@ -103,11 +117,12 @@ internal static class RankAutoPlay
                 Timings.Clear(); foreach(var item in next) Timings[item.Key]=item.Value;
                 _active=plans; _verified=false; AutoPlay.autoPlayMode=AutoPlay.AutoPlayMode.Rank;
                 ActiveTarget=_pendingTarget;
-                Status="Active " + ActiveTarget + ": " + string.Join(" | ", plans.Select(p=>$"P{p.Player+1} {p.Result.Achievement:0.0000}%"));
+                LastFailure="";
+                State("Active","Active " + ActiveTarget + ": " + string.Join(" | ", plans.Select(p=>$"P{p.Player+1} {p.Result.Achievement:0.0000}%")));
             }
             catch (Exception ex)
             {
-                Requested=Active; Status="Rank control unchanged: " + ex.Message; MelonLogger.Warning(Status);
+                Fail(ex);
             }
             finally { PlaySession.SetPause(_wasPaused); }
         }
@@ -128,14 +143,22 @@ internal static class RankAutoPlay
             _pendingTarget=TargetRank + " / " + Minimum;
             _cancel=new CancellationTokenSource(); var token=_cancel.Token;
             _pending=Task.Run(()=> { foreach(var p in plans) p.Result=ScorePlanner.Generate(p.Request,token); return plans; });
-            Status="Generating remaining-note plan...";
+            State("Planning","Generating remaining-note plan...");
         }
         catch (Exception ex)
         {
-            Requested=Active; Status="Rank control unchanged: " + ex.Message;
+            Fail(ex);
             if (froze && _owner==PlaySession.Owner && PlaySession.Playing) PlaySession.SetPause(_wasPaused);
-            MelonLogger.Warning(Status);
         }
+    }
+    private static void Fail(Exception ex)
+    {
+        // Retain selection and any old valid plan, but never resume the previous
+        // ordinary AutoPlay mode when a new rank plan cannot be produced.
+        Requested=true;AutoPlay.autoPlayMode=AutoPlay.AutoPlayMode.Rank;
+        LastFailure=(Active?"Previous rank plan retained: ":"Rank planning failed; manual control: ")+ex.Message;
+        State(Active?"Active":"Failed",LastFailure);
+        Runtime.Commands.Status=Status;
     }
     private static void AddConnections(NoteData note,int timing,Dictionary<int,int> map)
     {
@@ -167,6 +190,7 @@ internal static class RankAutoPlay
                 (p.Request.IncludeUpper ? actual>p.Request.Upper : actual>=p.Request.Upper))
             {
                 Status=$"P{p.Player+1}: actual result differs from rank plan; see log.";
+                LastFailure=Status;
                 MelonLogger.Error(Status); return;
             }
         }

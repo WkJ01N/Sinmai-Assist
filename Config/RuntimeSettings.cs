@@ -26,6 +26,13 @@ public sealed class RuntimeSettings
     public double IntervalSeconds { get; set; } = 5;
     public float PracticeSpeed { get; set; } = 1;
     public bool PreservePracticePitch { get; set; } = true;
+    public bool MuteAll { get; set; }
+    public bool MuteMusic { get; set; }
+    public bool MuteMenuMusic { get; set; }
+    public bool MuteGameEffects { get; set; }
+    public bool MuteMenuEffects { get; set; }
+    public bool MuteVoices { get; set; }
+    public bool MuteNotifications { get; set; }
     public BatchSettings Batch { get; set; } = new BatchSettings();
 
     public RuntimeSettings Copy() { var copy=(RuntimeSettings)MemberwiseClone();copy.Batch=Batch.Copy();return copy; }

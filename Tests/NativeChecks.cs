@@ -1,6 +1,7 @@
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Collections.Immutable;
+using SinmaiAssist.Cheat;
 
 internal static class NativeChecks
 {
@@ -76,17 +77,55 @@ internal static class NativeChecks
     private static void CheckBatchInterfaces(MetadataReader r,Dictionary<string,TypeDefinitionHandle> types)
     {
         var provider=new SignatureKinds(new());
+        var nested=r.TypeDefinitions.ToDictionary(h=>DefinitionName(r,h));
+        bool HasMethod(string typeName,string methodName,params string[] parameters)
+        {
+            if(!nested.TryGetValue(typeName,out var handle))return false;
+            while(!handle.IsNil)
+            {
+                var type=r.GetTypeDefinition(handle);
+                if(type.GetMethods().Select(h=>r.GetMethodDefinition(h)).Any(m=>r.GetString(m.Name)==methodName&&
+                    m.DecodeSignature(provider,(object)null).ParameterTypes.SequenceEqual(parameters)))return true;
+                handle=type.BaseType.Kind==HandleKind.TypeDefinition?(TypeDefinitionHandle)type.BaseType:default;
+            }
+            return false;
+        }
+        foreach(var method in BatchInterfaces.FlowMethods.Concat(BatchInterfaces.UploadMethods))
+            if(!HasMethod(method.TypeName,method.Name,method.Parameters))throw new Exception("Native batch method mismatch: "+method);
+        if(HasMethod(BatchInterfaces.DeployList.TypeName,"SetDeployList","System.Boolean"))
+            throw new Exception("Unexpected one-argument SetDeployList: review the SDGB156E regression fixture.");
+        foreach(var requirement in BatchInterfaces.Members)
+        foreach(string member in requirement.Value)
+        {
+            bool found=false;
+            var handle=nested[requirement.Key];
+            while(!handle.IsNil)
+            {
+                var type=r.GetTypeDefinition(handle);
+                if(type.GetFields().Any(h=>r.GetString(r.GetFieldDefinition(h).Name)==member)||
+                    type.GetProperties().Any(h=>r.GetString(r.GetPropertyDefinition(h).Name)==member)){found=true;break;}
+                handle=type.BaseType.Kind==HandleKind.TypeDefinition?(TypeDefinitionHandle)type.BaseType:default;
+            }
+            if(!found)throw new Exception("Native batch member missing (including base types): "+requirement.Key+"."+member);
+        }
         MethodSignature<string>[] Constructors(string type)=>r.GetTypeDefinition(types[type]).GetMethods().Select(h=>r.GetMethodDefinition(h))
             .Where(m=>r.GetString(m.Name)==".ctor").Select(m=>m.DecodeSignature(provider,(object)null)).ToArray();
         void RequireConstructor(string type,params string[] parameters)
-        {if(!Constructors(type).Any(s=>s.ParameterTypes.SequenceEqual(parameters)))throw new Exception("Native batch constructor mismatch: "+type);}
-        RequireConstructor("Net.Packet.Mai2.PacketUpsertUserAll","Int32","Manager.UserData","Int32","System.Action`1","System.Action`1");
-        RequireConstructor("Net.Packet.Mai2.PacketUpsertUserAll","Int32","UInt64","Net.VO.Mai2.UserAll","System.Collections.Generic.List`1","System.Action`1","System.Action`1");
-        RequireConstructor("Net.Packet.Mai2.PacketUploadUserPlaylog","UInt64","Net.VO.Mai2.UserPlaylog","System.Action`1","System.Action`1");
-        RequireConstructor("Manager.UserDatas.UserRate","Int32","Int32","UInt32","UInt32");
-        var nested=r.TypeDefinitions.ToDictionary(h=>DefinitionName(r,h));
+        {if(!Constructors(type).Any(s=>s.ParameterTypes.SequenceEqual(parameters)))throw new Exception("Native batch constructor mismatch: "+type+"("+string.Join(", ",parameters)+")");}
+        const string done="System.Action`1<System.Int32>",error="System.Action`1<Net.Packet.PacketStatus>";
+        RequireConstructor("Net.Packet.Mai2.PacketUpsertUserAll","System.Int32","Manager.UserData","System.Int32",done,error);
+        RequireConstructor("Net.Packet.Mai2.PacketUpsertUserAll","System.Int32","System.UInt64","Net.VO.Mai2.UserAll","System.Collections.Generic.List`1<Net.VO.Mai2.UserPlaylog>",done,error);
+        RequireConstructor("Net.Packet.Mai2.PacketUploadUserPlaylog","System.UInt64","Net.VO.Mai2.UserPlaylog",done,error);
+        RequireConstructor("Manager.UserDatas.UserRate","System.Int32","System.Int32","System.UInt32","System.UInt32");
         foreach(var pair in new[]{("Process.MusicSelectProcess+MainSequence","Update",3),("Process.MusicSelectProcess+MainSequence","ReleaseWait",4),
-            ("Process.NextTrackProcess+NextTrackMode","NextTrack",0),("Process.UnlockProcess+UnlockSequence","DispEnd",4),("DB.PlayComboflagID","AllPerfectPlus",4)})
+            ("Process.NextTrackProcess+NextTrackMode","NextTrack",0),("Process.UnlockProcess+UnlockSequence","DispEnd",4),("DB.PlayComboflagID","AllPerfectPlus",4),
+            ("Manager.SoundManager+PlayerID","Music",2),("Manager.SoundManager+PlayerID","SystemStart",3),
+            ("Manager.SoundManager+PlayerID","SystemAdvVoice0",4),("Manager.SoundManager+PlayerID","SystemEnd",6),
+            ("Manager.SoundManager+PlayerID","Bgm",7),("Manager.SoundManager+PlayerID","Voice",8),("Manager.SoundManager+PlayerID","PartnerVoice",9),
+            ("Manager.SoundManager+PlayerID","Jingle",10),("Manager.SoundManager+PlayerID","SeStart",11),
+            ("Manager.SoundManager+PlayerID","LoopSeEnd",16),("Manager.SoundManager+PlayerID","GameSeStart",17),
+            ("Manager.SoundManager+PlayerID","Sound_Sepalate_End",41),("Manager.SoundManager+PlayerID","Sound_Sepalate_Right",42),
+            ("Manager.SoundManager+PlayerID","Sound_Sepalate_Finish",75)})
         {
             var type=r.GetTypeDefinition(nested[pair.Item1]);var field=type.GetFields().Select(h=>r.GetFieldDefinition(h)).Single(f=>r.GetString(f.Name)==pair.Item2);
             if(r.GetBlobReader(r.GetConstant(field.GetDefaultValue()).Value).ReadInt32()!=pair.Item3)throw new Exception("Native batch state constant mismatch: "+pair.Item1+"."+pair.Item2);
@@ -94,7 +133,7 @@ internal static class NativeChecks
         var musicType=r.GetTypeDefinition(nested["Process.MusicSelectProcess+MusicSelectData"]);
         var members=musicType.GetFields().Select(h=>r.GetString(r.GetFieldDefinition(h).Name)).ToHashSet();
         foreach(string name in new[]{"MusicData","ScoreData","Difficulty","isEnable","isExistsScore"})if(!members.Contains(name))throw new Exception("Native batch queue field missing: "+name);
-        Console.WriteLine("PASS: CN upload track-count and immutable-snapshot constructors, selection/result/retry/checkpoint interfaces, AP+ flag and batch state constants.");
+        Console.WriteLine($"PASS: {BatchInterfaces.FlowMethods.Length+BatchInterfaces.UploadMethods.Length} exact Batch method signatures, inherited members, CN snapshot constructors/callbacks, AP+ flag and state constants.");
     }
     private static void CheckMediaInterfaces(string path)
     {
@@ -111,13 +150,22 @@ internal static class NativeChecks
             var names=r.GetTypeDefinition(handle).GetMethods().Select(h=>r.GetString(r.GetMethodDefinition(h).Name)).ToHashSet();
             foreach(var name in pair.Value)if(!names.Contains(name))throw new Exception("Missing media interface: "+pair.Key+"."+name);
         }
+        var provider=new SignatureKinds(new());
+        foreach(var signature in new[]{("SetVolume",new[]{"System.Single"}),("GetParameterFloat32",new[]{"CriAtomEx+Parameter"}),
+            ("ResetParameters",Array.Empty<string>()),("Start",Array.Empty<string>()),("Dispose",Array.Empty<string>()),("get_isAvailable",Array.Empty<string>())})
+        {
+            if(!r.GetTypeDefinition(types["CriAtomExPlayer"]).GetMethods().Select(h=>r.GetMethodDefinition(h)).Any(m=>
+                r.GetString(m.Name)==signature.Item1&&m.DecodeSignature(provider,(object)null).ParameterTypes.SequenceEqual(signature.Item2)))
+                throw new Exception("Native mute interface mismatch: CriAtomExPlayer."+signature.Item1+"("+string.Join(", ",signature.Item2)+")");
+        }
+        Console.WriteLine("PASS: exact native CRI mute method signatures and SoundManager player mappings.");
         Console.WriteLine("PASS: native CRI practice music routing, time stretch, voice-pool lifetime and movie speed interfaces.");
     }
 
     public static void CheckSignatures(string modPath,string gamePath)
     {
         var actual=new Dictionary<(string,string),bool>();
-        foreach(var path in new[]{gamePath,Path.Combine(Path.GetDirectoryName(gamePath),"AMDaemon.NET.dll")})
+        foreach(var path in new[]{gamePath,Path.Combine(Path.GetDirectoryName(gamePath),"AMDaemon.NET.dll"),Path.Combine(Path.GetDirectoryName(gamePath),"Assembly-CSharp-firstpass.dll")})
         {
             using var file=File.OpenRead(path);using var pe=new PEReader(file);var r=pe.GetMetadataReader();
             string assembly=r.GetString(r.GetAssemblyDefinition().Name);
@@ -138,7 +186,7 @@ internal static class NativeChecks
         }
         foreach(var h in metadata.MethodDefinitions) metadata.GetMethodDefinition(h).DecodeSignature(provider,(object)null);
         foreach(var h in metadata.FieldDefinitions) metadata.GetFieldDefinition(h).DecodeSignature(provider,(object)null);
-        Console.WriteLine($"PASS: {provider.Checked} game/AMDaemon value-vs-reference signature occurrences match runtime metadata.");
+        Console.WriteLine($"PASS: {provider.Checked} game/AMDaemon/CRI value-vs-reference signature occurrences match runtime metadata.");
     }
     private static string DefinitionName(MetadataReader r,TypeDefinitionHandle h)
     {
@@ -171,10 +219,10 @@ internal static class NativeChecks
         }
         public string GetTypeFromDefinition(MetadataReader r,TypeDefinitionHandle h,byte kind)=>DefinitionName(r,h);
         public string GetTypeFromSpecification(MetadataReader r,object c,TypeSpecificationHandle h,byte kind)=>r.GetTypeSpecification(h).DecodeSignature(this,c);
-        public string GetArrayType(string t,ArrayShape s)=>t;public string GetByReferenceType(string t)=>t;public string GetFunctionPointerType(MethodSignature<string> s)=>"fn";
-        public string GetGenericInstantiation(string t,ImmutableArray<string> a)=>t;public string GetGenericMethodParameter(object c,int i)=>"M";public string GetGenericTypeParameter(object c,int i)=>"T";
+        public string GetArrayType(string t,ArrayShape s)=>t+"["+new string(',',s.Rank-1)+"]";public string GetByReferenceType(string t)=>t+"&";public string GetFunctionPointerType(MethodSignature<string> s)=>"fn";
+        public string GetGenericInstantiation(string t,ImmutableArray<string> a)=>t+"<"+string.Join(",",a)+">";public string GetGenericMethodParameter(object c,int i)=>"M";public string GetGenericTypeParameter(object c,int i)=>"T";
         public string GetModifiedType(string m,string t,bool r)=>t;public string GetPinnedType(string t)=>t;public string GetPointerType(string t)=>t;
-        public string GetPrimitiveType(PrimitiveTypeCode c)=>c.ToString();public string GetSZArrayType(string t)=>t;
+        public string GetPrimitiveType(PrimitiveTypeCode c)=>"System."+c;public string GetSZArrayType(string t)=>t+"[]";
     }
 
     private static string FullName(MetadataReader metadata,TypeDefinitionHandle handle)

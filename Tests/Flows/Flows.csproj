@@ -2,10 +2,24 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>12</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <NoWarn>$(NoWarn);CS0649;CS0414</NoWarn>
+    <NoWarn>$(NoWarn);CS0649;CS0414;CA1416</NoWarn>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(UseRealHarmony)'=='true'">
+    <TargetFramework>net472</TargetFramework>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <DefineConstants>$(DefineConstants);REAL_HARMONY</DefineConstants>
+    <GameMelonDirectory Condition="'$(GameMelonDirectory)'==''">$(MSBuildProjectDirectory)/../../Libs</GameMelonDirectory>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(UseRealHarmony)'=='true'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="All" />
+    <Reference Include="0Harmony"><HintPath>../../Libs/0Harmony.dll</HintPath></Reference>
+    <Reference Include="MonoMod.RuntimeDetour"><HintPath>$(GameMelonDirectory)/MonoMod.RuntimeDetour.dll</HintPath></Reference>
+    <Reference Include="MonoMod.Utils"><HintPath>$(GameMelonDirectory)/MonoMod.Utils.dll</HintPath></Reference>
+    <Reference Include="Mono.Cecil"><HintPath>$(GameMelonDirectory)/Mono.Cecil.dll</HintPath></Reference>
+  </ItemGroup>
   <ItemGroup>
     <Compile Include="../../Cheat/ScorePlanner.cs" Link="ScorePlanner.cs" />
     <Compile Include="../../Cheat/LoopState.cs" Link="LoopState.cs" />
@@ -17,5 +31,10 @@
     <Compile Include="../../Cheat/PlaybackRate.cs" Link="PlaybackRate.cs" />
     <Compile Include="../../Cheat/AudioTimeline.cs" Link="AudioTimeline.cs" />
     <Compile Include="../../Cheat/PracticeAudio.cs" Link="PracticeAudio.cs" />
+    <Compile Include="../../Cheat/AudioMute.cs" Link="AudioMute.cs" />
+    <Compile Include="../../Runtime/AutoPlaySelection.cs" Link="AutoPlaySelection.cs" />
+    <Compile Include="../../Runtime/MuteState.cs" Link="MuteState.cs" />
+    <Compile Include="../../Runtime/AudioSessionMute.cs" Link="AudioSessionMute.cs" />
+    <Compile Include="../../Utils/GameAudioSessions.cs" Link="GameAudioSessions.cs" />
   </ItemGroup>
 </Project>

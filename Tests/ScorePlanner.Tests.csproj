@@ -16,12 +16,16 @@
     <Compile Include="../Runtime/BindingCapture.cs" Link="BindingCapture.cs" />
     <Compile Include="../Runtime/Commands.cs" Link="Commands.cs" />
     <Compile Include="../Runtime/SettingsStore.cs" Link="SettingsStore.cs" />
+    <Compile Include="../Runtime/AutoPlaySelection.cs" Link="AutoPlaySelection.cs" />
+    <Compile Include="../Runtime/MuteState.cs" Link="MuteState.cs" />
+    <Compile Include="../Runtime/AudioSessionMute.cs" Link="AudioSessionMute.cs" />
     <Compile Include="../Cheat/LoopState.cs" Link="LoopState.cs" />
     <Compile Include="../Cheat/RateClock.cs" Link="RateClock.cs" />
     <Compile Include="../Config/BatchSettings.cs" Link="BatchSettings.cs" />
     <Compile Include="../Cheat/BatchPolicy.cs" Link="BatchPolicy.cs" />
     <Compile Include="../Cheat/BatchUpload.cs" Link="BatchUpload.cs" />
     <Compile Include="../Cheat/BatchRun.cs" Link="BatchRun.cs" />
+    <Compile Include="../Cheat/BatchInterfaces.cs" Link="BatchInterfaces.cs" />
     <Compile Include="../GUI/InfoSnapshot.cs" Link="InfoSnapshot.cs" />
     <Compile Include="../Utils/RuntimePropertyReader.cs" Link="RuntimePropertyReader.cs" />
     <PackageReference Include="YamlDotNet" Version="16.1.0" />

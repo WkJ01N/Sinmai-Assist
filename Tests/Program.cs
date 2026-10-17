@@ -14,6 +14,8 @@ internal static class Program
         InfoChecks.Run();
         RuntimeChecks.Run();
         BatchChecks.Run();
+        BatchInterfaceChecks.Run();
+        AudioChecks.Run();
         uint[][] rows = {
             new uint[] {0,250,400,400,400,500,500,500,500,500,400,400,400,250,0},
             new uint[] {0,500,800,800,800,1000,1000,1000,1000,1000,800,800,800,500,0},

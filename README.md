@@ -45,6 +45,7 @@ Use **MelonLoader 0.6.4 or earlier**. Current compatibility checks target **SDGB
 - **Configurable Hotkeys** - Bind a single keyboard key to runtime actions or presets; new bindings default to `None`.
 - **Show Info** - Display game/data versions, server address, Keychip ID, and player IDs with independent field recovery.
 - **Server Address Masking** - Hide the server address in the information overlay.
+- **Mute** - Instantly mute song music/previews, menu BGM, gameplay effects, menu effects, voices, and notifications separately. Whole-game mute also covers the game's Windows audio sessions; category settings are retained when it is released.
 - **Show FPS** - Display the current frame rate.
 - **Dummy Login** - Provide simulated card/QR login input; player-ID login remains unresolved on the current CN version.
 - **Custom Camera IDs** - Select the camera devices used for Chime, QR scanning, and photos.
@@ -93,6 +94,8 @@ Use **MelonLoader 0.6.4 or earlier**. Current compatibility checks target **SDGB
 - Practice sessions do not save or upload song scores. Exit through **Exit practice and restart whole song** to resume normal scoring.
 - Score generation and practice support ordinary solo and local two-player charts; special modes are excluded. Unreachable rank/combo combinations are reported.
 - Batch defaults to 10 songs at the current difficulty, without crossing categories. Low-level boost is off by default; its initial threshold is displayed level 12+.
+- Rank control stays selected while armed, planning, or waiting for the next song. If planning fails, its reason remains visible; an existing valid rank plan is retained, otherwise manual play resumes without re-enabling the earlier ordinary AutoPlay mode. Use **Enable / replan rank control** to retry or explicitly select another mode.
+- The **Mute** tab applies to both local players. Its switches are also available in **Hotkeys** and follow the existing manual settings/preset save flow. Muting changes output volume without stopping song timing. Whole-game mute affects this game process's audio sessions; it does not change the Windows endpoint volume or other applications.
 - Do not run Batch alongside AquaMai ImmediateSave or another automatic score uploader. Unknown upload outcomes pause the batch and require review before continuation.
 - Audio synchronization, actual server saves, and repeated batch track resets still require in-game verification.
 
@@ -116,6 +119,36 @@ dotnet run --project Tests/ScorePlanner.Tests.csproj -- "GAME/Sinmai_Data/Manage
 ```
 
 These tests do not launch the game or send upload requests. Game files, dependencies, logs, and build output are excluded from the repository.
+
+Actual Harmony registration tests use .NET Framework 4.7.2 and the game's MelonLoader dependencies (the old runtime-detour library cannot run under .NET 10):
+
+```powershell
+dotnet build Tests/Flows/Flows.csproj -p:UseRealHarmony=true -p:GameMelonDirectory="GAME/MelonLoader/net35"
+Tests/Flows/bin/Debug/net472/Flows.exe --patches
+Tests/Flows/bin/Debug/net472/Flows.exe --audio-probe
+```
+
+The audio probe only enumerates Windows sessions and reads mute state; it never changes audio settings. The hook tests use audio-boundary doubles and do not play sound or mute real sessions.
+
+### Rank and Mute In-game Verification
+
+1. Select an ordinary AutoPlay mode, then enable Rank while selecting a song. Confirm **Rank (Armed)** changes to **Planning**, then **Active**, and remains selected for two consecutive songs and a retry.
+2. Enable Rank during a song; confirm earlier judgements stay intact. Check the target and final result. For a failed or blocked request, confirm a clear reason remains in the Rank area and the earlier ordinary mode does not resume automatically after an accepted request.
+3. In **Mute**, toggle each category while its sound is playing and trigger another sound in that category. Test music preview, song music, menu BGM, Tap/Slide/Break effects, voices, menu buttons and result notifications, including both local players.
+4. Enable one category, toggle **Mute whole game** on and off, and confirm the category remains muted while other sounds return at their intended volumes. Repeat after a song change, pause/resume, seek/retry and practice/SpeedHack changes; timing must remain unchanged.
+5. Bind a mute shortcut, save settings, restart, and check restoration. Confirm Mute works while Batch runs, and other applications keep their audio. Whole-game status must report a missing/failed Windows session instead of claiming full coverage when that session cannot be controlled.
+
+### Batch Compatibility and In-game Verification
+
+Batch preflight and native metadata tests share the same exact method signatures and inherited-member requirements. SDGB156E uses `SetDeployList(bool, bool)`; both arguments are explicitly `false` when opening the next queued song. Upload snapshot constructors are checked with their complete parameter and callback types. Missing interfaces report the expected native signature.
+
+After building, exit the game, back up `Mods/Sinmai-Assist.dll` outside `Mods`, and replace it with `Output/Sinmai-Assist.dll`. Leave the existing configuration and progress files in place. Offline tests verify interfaces and simulated flows; actual game transitions and server persistence require these manual checks:
+
+1. Log in normally, open an ordinary song category, and run one song at the current difficulty with boost and skip-existing disabled. Confirm Batch starts, selects the requested chart, reaches results, saves the final partial batch, and returns to selection.
+2. Let `L` be the normal native track limit. Queue `2 * L + 1` songs in a category containing enough songs (for example, 9 songs for a limit of 4). Confirm two full uploads, one final partial upload, and track-number resets only after successful upload acknowledgements. Check server history for each requested chart and target, including missing or duplicate play logs.
+3. During another run, pause and resume, then stop with scores pending. Confirm pause prevents further progress and Stop saves pending scores before finishing.
+4. Repeat with all available difficulties, then with two logged-in local players selecting different difficulties. Confirm each player's chart, result, and server record match the queue.
+5. Confirm the original play mode, timer behavior, and normal song selection are restored after Batch finishes. If an upload outcome is unknown, verify server history before using the existing review/recovery controls.
 
 ## Links
 

@@ -16,6 +16,7 @@ public class MainGUI
         DummyLogin,
         UserData,
         Graphic,
+        Mute,
         Debug,
         Settings,
         Hotkeys
@@ -88,6 +89,7 @@ public class MainGUI
         else if (_toolbar == Toolbar.DummyLogin && SinmaiAssist.MainConfig.Common.DummyLogin.Enable) DummyLoginPanel.OnGUI();
         else if (_toolbar == Toolbar.UserData) UserDataPanel.OnGUI();
         else if (_toolbar == Toolbar.Graphic) GraphicPanel.OnGUI();
+        else if (_toolbar == Toolbar.Mute) MutePanel.OnGUI();
         else if (_toolbar == Toolbar.Debug) DebugPanel.OnGUI();
         else if (_toolbar == Toolbar.Settings) SettingsPanel.OnGUI();
         else if (_toolbar == Toolbar.Hotkeys) HotkeysPanel.OnGUI();

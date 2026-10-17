@@ -48,10 +48,11 @@ namespace SinmaiAssist.Cheat
     }
     public static class RankAutoPlay
     {
-        public static bool Requested,IsBusy;
+        public static bool Requested,IsBusy,Active;
         public static string TargetRank="SSS";
         public static MinimumCombo Minimum;
-        public static void Request()=>Requested=true;
+        public static void Request(){Requested=true;AutoPlay.autoPlayMode=AutoPlay.AutoPlayMode.Rank;}
+        public static void ReportBlocked(string text){}
         public static void Cancel(bool clear) {if(clear)Requested=false;}
     }
     public static class PracticeLoop

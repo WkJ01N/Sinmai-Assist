@@ -37,7 +37,7 @@ internal static class PracticeAudio
             return item==null?null:PlayerField.GetValue(item);
         }
     }
-    public static void Prepare(bool preservePitch)
+    public static void PreparePracticeMusic(bool preservePitch)
     {
         if(!Installed || !Compatible || MusicPlayer==null) throw new InvalidOperationException("Practice music speed interfaces unavailable.");
         if(!preservePitch) return;

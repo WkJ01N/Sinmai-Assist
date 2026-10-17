@@ -98,10 +98,31 @@ internal static class RuntimeChecks
             Check(rejected,"invalid interval rejected");
             MigrationChecks(dir);
             BatchPersistenceChecks(dir);
+            MutePersistenceChecks(dir);
             ClockChecks();
             Console.WriteLine("PASS: production settings/preset persistence, rollback, recovery, legacy keys, capture/dispatch suppression and loop policies.");
         }
         finally {Directory.Delete(dir,true);}
+    }
+    private static void MutePersistenceChecks(string root)
+    {
+        string dir=Path.Combine(root,"mute");Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir,"RuntimeSettings.yml"),"formatVersion: 3\nsaved:\n  autoPlayMode: None\n");
+        MuteState.Apply(true,true,true,true,true,true,true);SettingsStore.Initialize(dir);
+        Check(!MuteState.Master&&!MuteState.Get(SoundGroup.Music),"v3 config without mute fields defaults to audible");
+        MuteState.Apply(true,true,false,true,false,true,false);
+        Check(SettingsStore.Dirty,"mute changes participate in dirty detection");
+        SettingsStore.NameInput="Quiet";SettingsStore.SelectedId=null;SettingsStore.Create();
+        MuteState.Apply(false,false,false,false,false,false,false);
+        SettingsStore.ApplySelected();
+        Check(MuteState.Master&&MuteState.Get(SoundGroup.Voices)&&!MuteState.Get(SoundGroup.MenuMusic),"preset preserves all independent mute flags");
+        SettingsStore.Save();MuteState.Apply(false,false,false,false,false,false,false);SettingsStore.Initialize(dir);
+        Check(MuteState.Master&&MuteState.Get(SoundGroup.GameEffects)&&!SettingsStore.Dirty,"saved mute state restores on restart");
+        BatchController.Active=true;int changes=0;
+        Commands.Add("mute.test","Audio","Mute test",()=>changes++);
+        Commands.Enqueue("mute.test");Commands.Update();
+        Check(changes==1,"audio commands remain available during Batch");
+        BatchController.Active=false;MuteState.Apply(false,false,false,false,false,false,false);
     }
     private static void MigrationChecks(string root)
     {

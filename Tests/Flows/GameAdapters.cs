@@ -1,5 +1,6 @@
 // Minimal native boundary doubles. These do not emulate rendering/audio or prove in-game behavior.
 using System.Reflection;
+#if !REAL_HARMONY
 namespace HarmonyLib
 {
     [AttributeUsage(AttributeTargets.All,AllowMultiple=true)] public sealed class HarmonyPatch:Attribute {public HarmonyPatch(){} public HarmonyPatch(Type _,string __){}}
@@ -15,10 +16,12 @@ namespace HarmonyLib
         public static Type TypeByName(string name)=>typeof(AccessTools).Assembly.GetType(name);
     }
 }
+#endif
 namespace MAI2.Util {public static class Singleton<T> where T:new(){public static T Instance{get;}=new();}}
-namespace MelonLoader {public static class MelonLogger{public static readonly List<string> Errors=new();public static void Error(object e)=>Errors.Add(e.ToString());public static void Warning(object e)=>Errors.Add(e.ToString());}}
+namespace MelonLoader {public static class MelonLogger{public static readonly List<string> Errors=new();public static void Error(object e)=>Errors.Add(e.ToString());public static void Warning(object e)=>Errors.Add(e.ToString());public static void Msg(object e){}}}
 namespace UnityEngine
 {
+    public static class AudioListener{public static float volume=1;}
     public static class Time{public static float realtimeSinceStartup;}
     public sealed class GameObject{public bool Active=true;public void SetActive(bool active)=>Active=active;}
     public class Component{public GameObject gameObject=new();}
@@ -43,7 +46,7 @@ namespace SinmaiAssist
 namespace SinmaiAssist.Runtime
 {
     internal static class Commands{public static string Status;}
-    internal static class SettingsStore{public static int Restores;public static void RestoreModeAtSongStart()=>Restores++;}
+    internal static class SettingsStore{public static int Restores;public static void RestoreModeAtSongStart(){Restores++;AutoPlaySelection.RestoreAtSongStart();}}
 }
 namespace Manager
 {
@@ -151,7 +154,10 @@ namespace Process
     {
         private int _sequence=4;private readonly Monitor.GameMonitor[] _monitors={new(),new()};private readonly Movie _gameMovie=new();
         public Movie Movie=>_gameMovie;public Monitor.GameMonitor[] Monitors=>_monitors;public int Releases,ResultSaves,Retries;
-        public void OnStart(){} public void OnUpdate(){}public void OnRelease(){}public void UpdateNotes(){}
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] public void OnStart(){}
+        public void OnUpdate(){}
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] public void OnRelease(){}
+        public void UpdateNotes(){}
         private bool IsPartyPlay()=>false;
         private void SetRelease(){Releases++;if(MAI2.Util.Singleton<Manager.GamePlayManager>.Instance.QuickRetry)Retries++;else ResultSaves++;_sequence=9;}
     }
@@ -165,7 +171,7 @@ namespace SinmaiAssist.Cheat
         public static bool IsBgmPlayer(int id)=>id>=2&&id<=4;
         public static void UpdateActiveBgmPitch(float pitch)=>MAI2.Util.Singleton<Manager.SoundCtrl>.Instance.Music.SetPitch(pitch);
     }
-    public static class AutoPlay {public enum AutoPlayMode{None,Critical,Rank}public static AutoPlayMode autoPlayMode;}
+    public static class AutoPlay {public enum AutoPlayMode{None,Critical,Perfect,Great,Good,Random,RandomAllPerfect,RandomFullComboPlus,RandomFullCombo,Rank}public static AutoPlayMode autoPlayMode;public static bool DisableUpdate;}
     public static class FastSkip{public enum SkipMode{Random}public static bool IsBusy;public static int Cancels;public static void CancelPending(){IsBusy=false;Cancels++;}}
     internal static class ScorePlanAdapter
     {
@@ -182,21 +188,42 @@ namespace SinmaiAssist.Cheat
 // Native audio-boundary doubles; no real DSP or buffers are emulated.
 public sealed class CriAtomExPlayer
 {
+    public bool isAvailable {get;private set;}=true;public float Volume=1;
+    public float GetParameterFloat32(CriAtomEx.Parameter id)=>Volume;
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public void SetVolume(float volume)
+    {
+#if !REAL_HARMONY
+        SinmaiAssist.Cheat.AudioMute.BeforeVolume(this,ref volume);
+#endif
+        Volume=volume;
+    }
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] public void Dispose(){isAvailable=false;}
     public uint Pool;public float Pitch,Stretch=1;public long StartTime,RawTime;public bool Paused,Stopped;
     public uint StartedPool;public float StartedPitch,StartedStretch;
     public void SetVoicePoolIdentifier(uint value)=>Pool=value;
     public void SetPitch(float value)=>Pitch=value;
     public void SetDspTimeStretchRatio(float value)=>Stretch=value;
     public void UpdateAll(){}
-    public void ResetParameters(){Pool=0;Pitch=0;Stretch=1;RawTime=0;Stopped=false;}
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public void ResetParameters(){Pool=0;Pitch=0;Stretch=1;RawTime=0;Stopped=false;Volume=1;
+#if !REAL_HARMONY
+        SinmaiAssist.Cheat.AudioMute.AfterReset(this);
+#endif
+    }
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     public void Start()
     {
+#if !REAL_HARMONY
+        SinmaiAssist.Cheat.AudioMute.BeforeStart(this);
+#endif
         try{typeof(SinmaiAssist.Cheat.PracticeAudio).GetMethod("BeforeStart",BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,new object[]{this});}
         catch(TargetInvocationException e){throw e.InnerException;}
         StartedPool=Pool;StartedPitch=Pitch;StartedStretch=Stretch;
     }
     public void Stop(){Stopped=true;Paused=true;}
 }
+public static class CriAtomEx {public enum Parameter{Volume}}
 public sealed class CriAtomExStandardVoicePool:IDisposable
 {
     public static bool FailAttach;public static int Created,Disposed;public bool Attached;

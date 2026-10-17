@@ -39,11 +39,17 @@ internal static class GameActions
         Add("info","Display","Toggle Show Info",()=>c.ModSetting.ShowInfo=!c.ModSetting.ShowInfo);
         Add("fps","Display","Toggle Show FPS",()=>c.Common.ShowFPS=!c.Common.ShowFPS);
         Add("maskServer","Display","Mask server URL",()=>c.ModSetting.MaskTitleServerUrl=!c.ModSetting.MaskTitleServerUrl);
-        foreach(var name in new[]{"AutoPlay","FastSkip","Batch","ChartController","DummyLogin","UserData","Graphic","Debug","Settings","Hotkeys"})
+        foreach(var name in new[]{"AutoPlay","FastSkip","Batch","ChartController","DummyLogin","UserData","Graphic","Mute","Debug","Settings","Hotkeys"})
         {
             string tab=name;Add("panel."+name,"Navigation","Open "+name,()=>MainGUI.Open(tab));
         }
         Add("save","Settings","Save settings, presets and shortcuts",SettingsStore.Save);
+        Add("mute.all","Audio","Mute whole game",()=>MuteState.Master=!MuteState.Master,Native);
+        foreach(SoundGroup value in Enum.GetValues(typeof(SoundGroup)))
+        {
+            var group=value;
+            Add("mute."+group,"Audio","Mute "+MutePanel.Labels[(int)group],()=>MuteState.Set(group,!MuteState.Get(group)),()=>Native()??(AudioMute.Installed?null:"Category mute hooks are unavailable."));
+        }
         Add("preset.create","Settings","Create preset",SettingsStore.Create);
         Add("preset.overwrite","Settings","Overwrite selected preset",SettingsStore.Overwrite);
         Add("preset.rename","Settings","Rename selected preset",SettingsStore.Rename);

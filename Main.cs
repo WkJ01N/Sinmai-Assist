@@ -223,6 +223,12 @@ namespace SinmaiAssist
             Patch(typeof(SpeedHackAudioClockPatch));
             Patch(typeof(SpeedHackBgmPitchPatch));
             if(PracticeAudio.Compatible)PracticeAudio.Installed=Patch(typeof(PracticeAudio));
+            if(AudioMute.Compatible)
+            {
+                bool volume=Patch(typeof(MuteVolumePatch)),reset=Patch(typeof(MuteResetPatch)),start=Patch(typeof(MuteStartPatch)),dispose=Patch(typeof(MuteDisposePatch));
+                AudioMute.Installed=volume&&reset&&start&&dispose;
+            }
+            AudioMute.Initialize();
             if(MainConfig.Cheat.FastSkip && PlaySession.Installed)BatchController.Installed=Patch(typeof(BatchController));
 
             // 默认加载项
@@ -239,6 +245,7 @@ namespace SinmaiAssist
             FastSkip.CancelPending();
             RankAutoPlay.Cancel(true);
             PracticeAudio.Release();
+            AudioMute.Shutdown();
             SpeedHack.RestoreGlobalSpeed();
             Application.logMessageReceived -= OnLogMessageReceived;
         }
@@ -254,6 +261,7 @@ namespace SinmaiAssist
             BatchController.Tick();
             ShowVersionInfo.Update();
             if (MainConfig.ModSetting.SafeMode) { SpeedHack.RestoreGlobalSpeed(); return; }
+            AudioMute.Tick(UnityEngine.Time.realtimeSinceStartup);
             SpeedHack.ApplyGlobalSpeedState();
 
         }

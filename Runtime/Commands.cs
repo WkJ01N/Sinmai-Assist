@@ -99,9 +99,9 @@ internal static class Commands
             try
             {
                 string error = op.Unavailable?.Invoke();
-                if(Cheat.BatchController.Active && op.Group!="Batch" && op.Group!="Display" && op.Group!="Navigation" && op.Group!="Speed")
+                if(Cheat.BatchController.Active && op.Group!="Batch" && op.Group!="Display" && op.Group!="Navigation" && op.Group!="Speed" && op.Group!="Audio")
                     error="Stop Batch before changing score/session settings or data.";
-                if (error != null) { Status = error; continue; }
+                if (error != null) { Status = error; if(id=="auto.rank")Cheat.RankAutoPlay.ReportBlocked(error); continue; }
                 Status=""; op.Run();
             }
             catch (Exception ex) { Status = op.Label + ": " + ex.Message; MelonLogger.Error(ex); }

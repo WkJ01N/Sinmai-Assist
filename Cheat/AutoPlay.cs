@@ -107,9 +107,7 @@ namespace SinmaiAssist.Cheat
         [HarmonyPatch(typeof(GameManager), "set_AutoPlay")]
         public static void AutoPlayUpdate()
         {
-            var mode = GameManager.AutoPlay;
-            if (BatchController.Active || DisableUpdate || RankAutoPlay.Requested) return;
-            autoPlayMode = (AutoPlayMode)mode;
+            Runtime.AutoPlaySelection.Synchronize((int)GameManager.AutoPlay);
         }
 
         [HarmonyPostfix]

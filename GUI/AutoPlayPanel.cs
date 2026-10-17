@@ -9,7 +9,7 @@ public class AutoPlayPanel
     internal static readonly string[] Ranks={"D","C","B","BB","BBB","A","AA","AAA","S","S+","SS","SS+","SSS","SSS+"};
     public static void OnGUI()
     {
-        GUILayout.Label("Mode: "+(RankAutoPlay.Requested && !RankAutoPlay.Active ? "Rank (armed)" : AutoPlay.autoPlayMode.ToString()),MainGUI.Style.Title);
+        GUILayout.Label("Mode: "+(SettingsStore.PreferredMode=="Rank" || RankAutoPlay.Requested ? "Rank ("+RankAutoPlay.Stage+")" : AutoPlay.autoPlayMode.ToString()),MainGUI.Style.Title);
         CommandUI.Toggle("auto.disableUpdate",AutoPlay.DisableUpdate,"Disable game mode synchronization");
         foreach(var mode in new[]{"None","Critical","Perfect","Great","Good","Random","RandomAllPerfect","RandomFullComboPlus","RandomFullCombo"})
             CommandUI.Button("auto."+mode);
@@ -20,6 +20,8 @@ public class AutoPlayPanel
         CommandUI.Button("auto.rank"); CommandUI.Button("auto.rankOff"); CommandUI.Button("auto.pause");
         if(RankAutoPlay.Active) GUILayout.Label("Active: "+RankAutoPlay.ActiveTarget,MainGUI.Style.Text);
         GUILayout.Label(RankAutoPlay.Status,MainGUI.Style.Text);
+        if(!string.IsNullOrEmpty(RankAutoPlay.LastFailure)&&RankAutoPlay.LastFailure!=RankAutoPlay.Status)
+            GUILayout.Label("Last failure: "+RankAutoPlay.LastFailure,new GUIStyle(MainGUI.Style.ErrorMessage){wordWrap=true});
     }
     internal static void DrawRank(string current,string prefix)
     {

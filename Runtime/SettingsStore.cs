@@ -14,7 +14,7 @@ internal static class SettingsStore
 {
     public static RuntimeSettingsDocument Document { get; private set; } = new RuntimeSettingsDocument();
     public static string NameInput = "", SelectedId;
-    public static string PreferredMode { get; private set; }
+    public static string PreferredMode => AutoPlaySelection.PreferredMode;
     private static string _directory, _savedFingerprint;
     private static readonly ISerializer Yaml = new SerializerBuilder().WithNamingConvention(CamelCaseNamingConvention.Instance)
         .WithTypeConverter(new KeyBindConfig.Converter()).Build();
@@ -30,13 +30,17 @@ internal static class SettingsStore
         var c = SinmaiAssist.MainConfig;
         return new RuntimeSettings {
             SpeedEnabled=c.Cheat.SpeedHack.Enable, GlobalSpeed=c.Cheat.SpeedHack.EnableGlobalSpeed, Speed=c.Cheat.SpeedHack.SpeedMultiplier,
-            AutoPlayMode=RankAutoPlay.Requested ? "Rank" : AutoPlay.autoPlayMode.ToString(), DisableModeUpdate=AutoPlay.DisableUpdate,
+            AutoPlayMode=PreferredMode=="Rank" || RankAutoPlay.Requested ? "Rank" : AutoPlay.autoPlayMode.ToString(), DisableModeUpdate=AutoPlay.DisableUpdate,
             SkipMode=FastSkip.Mode.ToString(), CustomAchievement=FastSkip.CustomAchivement, ForceMiss=FastSkip.Force1Miss,
             SkipRank=NormalizeRank(c.Cheat.RandomSkip.TargetRank), SkipCombo=c.Cheat.RandomSkip.MinimumCombo.ToString(),
             AutoRank=RankAutoPlay.TargetRank, AutoCombo=RankAutoPlay.Minimum.ToString(), ShowInfo=c.ModSetting.ShowInfo,
             ShowFps=c.Common.ShowFPS, ShowPanel=c.ModSetting.ShowPanel, MaskServer=c.ModSetting.MaskTitleServerUrl,
             LoopCount=PracticeLoop.Count, PreRollSeconds=PracticeLoop.PreRoll, IntervalSeconds=PracticeLoop.Interval,
-            PracticeSpeed=PracticeLoop.Speed, PreservePracticePitch=PracticeLoop.PreservePitch, Batch=copyBatch?BatchController.Settings.Copy():BatchController.Settings };
+            PracticeSpeed=PracticeLoop.Speed, PreservePracticePitch=PracticeLoop.PreservePitch,
+            MuteAll=MuteState.Master,MuteMusic=MuteState.Get(SoundGroup.Music),MuteMenuMusic=MuteState.Get(SoundGroup.MenuMusic),
+            MuteGameEffects=MuteState.Get(SoundGroup.GameEffects),MuteMenuEffects=MuteState.Get(SoundGroup.MenuEffects),
+            MuteVoices=MuteState.Get(SoundGroup.Voices),MuteNotifications=MuteState.Get(SoundGroup.Notifications),
+            Batch=copyBatch?BatchController.Settings.Copy():BatchController.Settings };
     }
     private static string NormalizeRank(string text) => (text ?? "SSS").ToUpperInvariant().Replace("P", "+");
     public static void Initialize(string directory)
@@ -114,7 +118,10 @@ internal static class SettingsStore
         BatchController.RequireIdle();
         settings.Validate();
         if(settings.AutoPlayMode=="Rank" && (PracticeLoop.Session || RankAutoPlay.IsBusy))
+        {
+            RankAutoPlay.ReportBlocked("Finish rank planning or restart the practice song before applying a rank preset.");
             throw new InvalidOperationException("Finish rank planning or restart the practice song before applying a rank preset.");
+        }
         var c = SinmaiAssist.MainConfig;
         c.Cheat.SpeedHack.Enable = settings.SpeedEnabled;
         c.Cheat.SpeedHack.EnableGlobalSpeed = settings.GlobalSpeed;
@@ -135,19 +142,15 @@ internal static class SettingsStore
         GUI.ChartControllerPanel.SyncInputs();
         AutoPlay.DisableUpdate=settings.DisableModeUpdate;
         SelectMode(settings.AutoPlayMode);
+        MuteState.Apply(settings.MuteAll,settings.MuteMusic,settings.MuteMenuMusic,settings.MuteGameEffects,settings.MuteMenuEffects,settings.MuteVoices,settings.MuteNotifications);
     }
     public static void SelectMode(string mode)
     {
-        BatchController.RequireIdle();
-        if (mode == "Rank" && PracticeLoop.Session) throw new InvalidOperationException("Restart the song to leave practice before rank control.");
-        if (mode == "Rank") { RankAutoPlay.Request(); PreferredMode = mode; return; }
-        var parsed = (AutoPlay.AutoPlayMode)Enum.Parse(typeof(AutoPlay.AutoPlayMode), mode);
-        RankAutoPlay.Cancel(true); AutoPlay.autoPlayMode=parsed; PreferredMode=mode;
+        AutoPlaySelection.Select(mode);
     }
     public static void RestoreModeAtSongStart()
     {
-        if(BatchController.Active)return;
-        if (PreferredMode != null) SelectMode(PreferredMode);
+        AutoPlaySelection.RestoreAtSongStart();
     }
     public static RuntimePreset Selected => Document.Presets.FirstOrDefault(p => p.Id == SelectedId);
     private static string ValidName()

@@ -17,6 +17,7 @@ internal static class Program
     {
         PracticeAudio.Release();
         RankAutoPlay.Cancel(true);PracticeLoop.ResetSong();
+        SinmaiAssist.Runtime.AutoPlaySelection.Select("None");
         SinmaiAssist.SinmaiAssist.MainConfig=new();
         PracticeLoop.Speed=1;PracticeLoop.PreservePitch=true;PracticeLoop.Interval=5;
         PracticeAudio.Installed=true;
@@ -229,8 +230,16 @@ internal static class Program
             await Task.Delay(2);Call(typeof(PlaySession),"Update",process);
         }
     }
-    private static async Task Main()
+    private static async Task Main(string[] args)
     {
+#if REAL_HARMONY
+        if(args.Contains("--patches")||args.Contains("--audio-probe"))
+        {
+            try {if(args.Contains("--audio-probe"))PatchChecks.ReadOnlyAudioProbe();else PatchChecks.Run();}
+            catch(Exception ex){for(var cause=ex;cause!=null;cause=cause.InnerException)Console.Error.WriteLine(cause.GetType().FullName+": "+cause.Message);Environment.ExitCode=1;}
+            return;
+        }
+#endif
         for(int k=0;k<6;k++)for(int t=0;t<15;t++)Scores[k,t]=(uint)(t==0||t==14?0:t>=5&&t<=9?500:250);
         MusicSyncChecks();
         PracticeRateChecks();
@@ -302,10 +311,10 @@ internal static class Program
         RankAutoPlay.Request();Call(typeof(PlaySession),"Update",process);
         Singleton<GamePlayManager>.Instance.GetGameScore(0).Results[0]=new(){Judged=true,Timing=7};
         await Drain(process);
-        Check(!RankAutoPlay.Active&&AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Critical,"newly judged note invalidates snapshot without replacing old mode");
+        Check(!RankAutoPlay.Active&&AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Rank&&RankAutoPlay.Stage=="Failed","newly judged note rejects snapshot and retains Rank selection with manual control");
         process=World(true);AutoPlay.autoPlayMode=AutoPlay.AutoPlayMode.Critical;ScorePlanAdapter.Source=()=>Plans();
         RankAutoPlay.Request();Call(typeof(PlaySession),"Update",process);Singleton<UserDataManager>.Instance.Users[1].IsEntry=false;
-        await Drain(process);Check(!RankAutoPlay.Active&&AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Critical,"changed player set rejects atomic takeover");
+        await Drain(process);Check(!RankAutoPlay.Active&&AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Rank&&RankAutoPlay.Stage=="Failed","changed player set rejects atomic takeover without reviving previous ordinary mode");
         process=World();ScorePlanAdapter.Plan[] captured=null;
         ScorePlanAdapter.Source=()=>{captured=Plans(MinimumCombo.AP);captured[0].Request.Upper=101;return captured;};
         RankAutoPlay.Request();Call(typeof(PlaySession),"Update",process);await Drain(process);
@@ -315,6 +324,39 @@ internal static class Program
             plan.Score.Achievement=plan.Result.Achievement+0.00000000000000000001m;
         }
         RankAutoPlay.Verify();Check(RankAutoPlay.Status.StartsWith("Rank plan verified"),"verification tolerates decimal arithmetic rounding without changing result");
+        await RankSelectionChecks();
+        MuteHookChecks.Run();
         Console.WriteLine($"PASS: {_checks} production timeline/practice/rank flow checks with native-boundary doubles (not in-game validation).");
+    }
+    private static async Task RankSelectionChecks()
+    {
+        var process=World();
+        var selection=typeof(SinmaiAssist.Runtime.AutoPlaySelection);
+        SinmaiAssist.Runtime.AutoPlaySelection.Select("RandomFullComboPlus");
+        SinmaiAssist.Runtime.AutoPlaySelection.Select("Rank");
+        Check(AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Rank&&RankAutoPlay.Stage=="Armed","accepted rank selection immediately replaces previous random mode");
+        SinmaiAssist.Runtime.AutoPlaySelection.Synchronize(0);
+        Check(AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Rank,"native startup reset cannot replace armed rank");
+        Call(typeof(PlaySession),"End",process);
+        var next=new Process.GameProcess();Call(typeof(PlaySession),"Start",next);
+        Check(RankAutoPlay.Requested&&RankAutoPlay.Stage=="Armed"&&AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Rank,"real startup restore preserves Rank across songs");
+        ScorePlanAdapter.Source=()=>Plans();Call(typeof(PlaySession),"Update",next);await Drain(next);
+        Check(RankAutoPlay.Active&&RankAutoPlay.Stage=="Active","restored Rank activates after startup");
+        SinmaiAssist.Runtime.AutoPlaySelection.Synchronize(1);
+        Check(AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Rank,"native setter cannot replace active rank");
+        SinmaiAssist.Runtime.AutoPlaySelection.Select("RandomFullCombo");
+        Check(!RankAutoPlay.Requested&&!RankAutoPlay.Active&&AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.RandomFullCombo,"explicit ordinary selection cancels rank");
+        ScorePlanAdapter.Allowed=false;SinmaiAssist.Runtime.AutoPlaySelection.Select("Rank");Call(typeof(PlaySession),"Update",next);
+        Check(RankAutoPlay.Requested&&RankAutoPlay.Stage=="Failed"&&!RankAutoPlay.Active,"planning failure retains rank and stops old ordinary autoplay");
+        SinmaiAssist.Runtime.AutoPlaySelection.Synchronize(0);
+        Check(AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Rank,"native synchronization cannot conceal planning failure");
+        ScorePlanAdapter.Allowed=true;SinmaiAssist.Runtime.AutoPlaySelection.Select("Rank");Call(typeof(PlaySession),"Update",next);await Drain(next);
+        Check(RankAutoPlay.Active,"rank can be explicitly retried after failure");
+        SinmaiAssist.Runtime.AutoPlaySelection.Select("Rank");Call(typeof(PlaySession),"Update",next);bool blocked=false;
+        try{SinmaiAssist.Runtime.AutoPlaySelection.Select("Rank");}catch(InvalidOperationException){blocked=true;}
+        Check(blocked&&RankAutoPlay.Active&&RankAutoPlay.Status.Contains("Could not enable"),"blocked request is visible and leaves valid plan untouched");
+        await Drain(next);SinmaiAssist.Runtime.AutoPlaySelection.Select("None");
+        AutoPlay.DisableUpdate=false;SinmaiAssist.Runtime.AutoPlaySelection.Synchronize(1);
+        Check(AutoPlay.autoPlayMode==AutoPlay.AutoPlayMode.Critical,"ordinary native synchronization remains available after leaving rank");
     }
 }

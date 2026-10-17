@@ -63,7 +63,7 @@ internal static class PracticeLoop
         _entered = _waiting = _intervalPaused = false;
         State.BeginRound();
         PlaySession.SetPause(true);
-        PracticeAudio.Prepare(PreservePitch);
+        PracticeAudio.PreparePracticeMusic(PreservePitch);
         ActiveSpeed = Speed; ActivePreservePitch = PreservePitch;
         PlaybackRate.Refresh();
         PlaySession.SetMovieSpeed(ActiveSpeed);
